@@ -44,13 +44,15 @@ function db(): PDO
     }
 
     try {
-        $databaseUrl = getenv('EASYSCHED_DATABASE_URL') ?: '';
+        // Railway's PostgreSQL plugin exposes DATABASE_URL by default. Keep
+        // the app-specific variable as the preferred override for other hosts.
+        $databaseUrl = getenv('EASYSCHED_DATABASE_URL') ?: (getenv('DATABASE_URL') ?: '');
         if ($databaseUrl === '') {
-            throw new RuntimeException('EASYSCHED_DATABASE_URL is required.');
+            throw new RuntimeException('EASYSCHED_DATABASE_URL or DATABASE_URL is required.');
         }
         $parts = parse_url($databaseUrl);
         if (!is_array($parts) || !in_array(strtolower((string) ($parts['scheme'] ?? '')), ['postgres', 'postgresql'], true) || empty($parts['host']) || empty($parts['path'])) {
-            throw new RuntimeException('EASYSCHED_DATABASE_URL must be a PostgreSQL connection URL.');
+            throw new RuntimeException('EASYSCHED_DATABASE_URL or DATABASE_URL must be a PostgreSQL connection URL.');
         }
         $query = [];
         parse_str((string) ($parts['query'] ?? ''), $query);
