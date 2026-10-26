@@ -24,6 +24,7 @@ RUN sed -i 's/\r$//' /var/www/html/docker-start.sh \
     && a2enconf easysched-root \
     && printf '<Directory /var/www/html/data>\n    DirectorySlash Off\n</Directory>\n' > /etc/apache2/conf-available/easysched-data.conf \
     && a2enconf easysched-data \
+    && printf '\nRewriteEngine On\nRewriteRule ^/(?:login|register|forgot-password|dashboard|overview|schedules?|room-requests|data|reports|profile|settings|help|audit-logs)/?$ /index.php [QSA,L,NC]\n' >> /etc/apache2/sites-available/000-default.conf \
     && apache2ctl -t \
     && chmod +x /var/www/html/docker-start.sh
 
