@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+</head>
+<body>
+    <h1>API Test</h1>
+    <button onclick="testAPI()">Test Bootstrap</button>
+    <pre id="output"></pre>
+    
+    <script>
+        async function testAPI() {
+            const output = document.getElementById('output');
+            output.textContent = 'Loading...';
+            
+            try {
+                const response = await fetch('api.php?action=bootstrap', {
+                    credentials: 'same-origin'
+                });
+                
+                output.textContent = `Status: ${response.status}\n`;
+                output.textContent += `Content-Type: ${response.headers.get('content-type')}\n`;
+                output.textContent += `\n--- Raw Response ---\n`;
+                
+                const text = await response.text();
+                output.textContent += text;
+                
+                output.textContent += `\n\n--- Parse as JSON ---\n`;
+                try {
+                    const json = JSON.parse(text);
+                    output.textContent += JSON.stringify(json, null, 2);
+                } catch (e) {
+                    output.textContent += `JSON Parse Error: ${e.message}\n`;
+                    output.textContent += `Text bytes: ${text.split('').map(c => c.charCodeAt(0)).join(', ')}\n`;
+                }
+            } catch (e) {
+                output.textContent = `Fetch Error: ${e.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
