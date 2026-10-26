@@ -12,7 +12,7 @@ EasySched is a complete class scheduling application for New Sinai School and Co
 - Login protection with independent IP/account throttles, exponential backoff, generic failure messages, failed-login audit events, and an adaptive arithmetic challenge after repeated failures.
 - Weekly calendar, filters, print view, CSV export, master-data forms, validated CSV import of class assignments, reports, manual scheduling of required or extra meetings, account password changes, and OTP-verified email changes.
 
-Set `EASYSCHED_DATABASE_URL` to a PostgreSQL connection URL in the server environment or private `.env` file. Email verification and password recovery are optional internet-connected features; see [`docs/EMAIL_OTP_SETUP.md`](docs/EMAIL_OTP_SETUP.md).
+Set `EASYSCHED_DATABASE_URL` to a PostgreSQL connection URL in the server environment or private `.env` file. On Railway, the PostgreSQL plugin's `DATABASE_URL` is accepted automatically; ensure it is available to the web service. Email verification and password recovery are optional internet-connected features; see [`docs/EMAIL_OTP_SETUP.md`](docs/EMAIL_OTP_SETUP.md).
 
 ## Run with XAMPP
 
@@ -44,7 +44,7 @@ Never import old plaintext passwords. Provision new accounts and set password ha
 
 ## Architecture
 
-`index.php` is the server-rendered shell. `script.js` requests JSON from `api.php` and renders pages without a frontend framework. `db.php` requires PostgreSQL from `EASYSCHED_DATABASE_URL`, applies `schema.postgres.sql`, and seeds an empty database. `api.php` contains authentication, authorization, validation, CRUD, generation, manual-edit validation, export, and audit logging.
+`index.php` is the server-rendered shell. `script.js` requests JSON from `api.php` and renders pages without a frontend framework. `db.php` requires PostgreSQL from `EASYSCHED_DATABASE_URL` or Railway's `DATABASE_URL`, applies `schema.postgres.sql`, and seeds an empty database. `api.php` contains authentication, authorization, validation, CRUD, generation, manual-edit validation, export, and audit logging.
 
 The core data model is:
 
