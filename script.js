@@ -716,7 +716,10 @@
       auditRefreshTimer = 0;
     }
     if (page === 'dashboard') renderDashboard();
-    if (page === 'schedules') { renderSchedules(); loadScheduleHistory(); }
+    if (page === 'schedules') {
+      renderSchedules();
+      if (role() !== 'student') loadScheduleHistory();
+    }
     if (page === 'room-requests') renderRoomRequests();
     if (page === 'data') renderData();
     if (page === 'reports') renderReports();
@@ -1689,7 +1692,7 @@
     const terms = state.snapshot.terms; const active = terms.find((term) => Number(term.id) === Number(state.snapshot.active_term_id)) || terms[0]; if (active) { $('#academicYear').value = active.academic_year; $('#semester').value = active.semester; } $('#settingsForm').closest('.panel').hidden = !canAdmin(); $('#accountEmailValue').textContent = state.snapshot.user.email || 'Not provided';
   }
 
-  function renderAll() { buildNavigation(); $$('.manage-only').forEach((element) => { element.hidden = !canManage(); }); $$('.admin-only').forEach((element) => { element.hidden = !canAdmin(); }); $$('.student-only').forEach((element) => { element.hidden = role() !== 'student'; }); navigate(state.page); }
+  function renderAll() { buildNavigation(); $$('.manage-only').forEach((element) => { element.hidden = !canManage(); }); $$('.admin-only').forEach((element) => { element.hidden = !canAdmin(); }); $$('.student-only').forEach((element) => { element.hidden = role() !== 'student'; }); $$('.student-hidden').forEach((element) => { element.hidden = role() === 'student'; }); navigate(state.page); }
 
   const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 

@@ -496,7 +496,7 @@ const EASYSCHED_SCHOOL = 'New Sinai School and Colleges Sta. Rosa, Inc.';
                             </table>
                         </div>
                     </article>
-                    <article class="panel schedule-history-panel">
+                    <article class="panel schedule-history-panel student-hidden">
                         <div class="panel-heading"><div><p class="eyebrow">Saved schedule versions</p><h3>Schedule history</h3><p class="muted">Open previously published schedules. Any sample schedule is illustrative only and is not a real historical record.</p></div></div>
                         <div class="table-wrap">
                             <table class="data-table">
