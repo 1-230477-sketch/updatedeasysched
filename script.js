@@ -93,9 +93,6 @@
   let selectedScheduleValidation = null;
   let selectedScheduleRun = null;
   let selectedScheduleIsSample = false;
-  let scheduleHistoryRows = [];
-  let scheduleHistoryLoaded = false;
-  let scheduleHistoryLoading = false;
   let scheduleTermRequestId = 0;
   let scheduleTermLoading = false;
   let auditRefreshTimer = 0;
@@ -233,55 +230,6 @@
         renderSchedules();
       }
     }
-  }
-
-  async function loadScheduleHistory() {
-    if (scheduleHistoryLoaded || scheduleHistoryLoading) return;
-    scheduleHistoryLoading = true;
-    renderScheduleHistory();
-    try {
-      scheduleHistoryRows = await request('schedule_history') || [];
-      scheduleHistoryRows.sort((left, right) =>
-        String(right.academic_year).localeCompare(String(left.academic_year))
-        || String(right.semester).localeCompare(String(left.semester))
-        || String(right.created_at || '').localeCompare(String(left.created_at || ''))
-      );
-      scheduleHistoryLoaded = true;
-    } catch (error) {
-      showToast('Could not load schedule history', error.message, 'error');
-    } finally {
-      scheduleHistoryLoading = false;
-      renderScheduleHistory();
-    }
-  }
-
-  function renderScheduleHistory() {
-    const body = $('#scheduleHistoryBody');
-    if (!body) return;
-    if (scheduleHistoryLoading) {
-      body.innerHTML = '<tr><td colspan="5">Loading schedule history…</td></tr>';
-      return;
-    }
-    if (!scheduleHistoryLoaded) {
-      body.innerHTML = '<tr><td colspan="5">Schedule history has not been loaded.</td></tr>';
-      return;
-    }
-    if (!scheduleHistoryRows.length) {
-      body.innerHTML = '<tr><td colspan="5">No saved schedule history is available yet.</td></tr>';
-      return;
-    }
-    body.innerHTML = scheduleHistoryRows.map((run) => {
-      const term = `${run.academic_year} · ${run.semester}`;
-      const savedAt = run.is_sample ? 'Illustrative example' : new Date(String(run.created_at).replace(' ', 'T')).toLocaleString();
-      const status = run.is_sample ? 'Sample only' : run.status === 'PUBLISHED' ? 'Current' : 'Archived';
-      const selected = run.is_sample
-        ? selectedScheduleIsSample && Number(selectedScheduleTermId) === Number(run.term_id)
-        : Number(selectedScheduleRun?.id) === Number(run.run_id);
-      const action = run.is_sample
-        ? `<button class="button button-ghost button-small" type="button" data-schedule-history-sample="${Number(run.term_id)}" ${selected ? 'disabled' : ''}>${selected ? 'Viewing sample' : 'View sample'}</button>`
-        : `<button class="button button-ghost button-small" type="button" data-schedule-history-run="${Number(run.run_id)}" ${selected ? 'disabled' : ''}>${selected ? 'Viewing' : 'View'}</button>`;
-      return `<tr><td>${esc(term)}</td><td>${esc(savedAt)}</td><td>${esc(run.class_count)}</td><td><span class="badge ${run.is_sample ? 'badge-warning' : run.status === 'PUBLISHED' ? 'badge-neutral' : 'badge-warning'}">${status}</span></td><td>${action}</td></tr>`;
-    }).join('');
   }
 
   async function viewSampleSchedule(termId) {
@@ -718,7 +666,6 @@
     if (page === 'dashboard') renderDashboard();
     if (page === 'schedules') {
       renderSchedules();
-      if (role() !== 'student') loadScheduleHistory();
     }
     if (page === 'room-requests') renderRoomRequests();
     if (page === 'data') renderData();
@@ -749,9 +696,6 @@
     selectedScheduleValidation = null;
     selectedScheduleRun = null;
     selectedScheduleIsSample = false;
-    scheduleHistoryRows = [];
-    scheduleHistoryLoaded = false;
-    scheduleHistoryLoading = false;
     scheduleTermRequestId += 1;
     scheduleTermLoading = false;
     if (!(NAV[snapshot.user.role] || []).some(([id]) => id === state.page)) state.page = 'dashboard';
@@ -987,7 +931,6 @@
     const valid = isActiveTerm && !selectedScheduleRun ? Boolean(state.snapshot.validation?.valid) : Boolean(selectedScheduleValidation?.valid);
     $('#conflictBadge').textContent = selectedScheduleIsSample ? 'Sample only' : selectedScheduleRun?.status === 'ARCHIVED' ? 'Archived version' : hasRun ? (valid ? 'Validated' : 'Conflict found') : 'No published schedule';
     $('#conflictBadge').className = `badge ${selectedScheduleIsSample ? 'badge-warning' : selectedScheduleRun?.status === 'ARCHIVED' || !hasRun ? 'badge-neutral' : (valid ? 'badge-neutral' : 'badge-warning')}`;
-    renderScheduleHistory();
     renderCalendar(rows);
     updatePrintMeta(rows.length);
     $$('.manage-column').forEach((cell) => { cell.hidden = !canManage(); });
@@ -2192,7 +2135,7 @@
     const home = $('#publicHome');
     if (!home || !('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
-    const groups = $$('.home-section-heading, .home-feature-grid, .home-step-grid, .home-benefit-grid, .home-about-copy, .home-contact-wrap', home)
+    const groups = $$('.home-section-heading, .home-feature-grid, .home-step-grid, .home-benefit-grid, .home-about-copy, .home-contact-wrap, .tutorial-content', home)
       .map((group) => Array.from(group.children));
     if (!groups.some((group) => group.length)) return;
 
@@ -2211,6 +2154,47 @@
         element.style.setProperty('--home-reveal-delay', `${Math.min(index, 5) * 85}ms`);
         observer.observe(element);
       });
+    });
+  }
+
+  function initHomeTutorials() {
+    const tutorial = $('#homeTutorials');
+    if (!tutorial) return;
+    const videoModal = $('#tutorialVideoModal');
+    const videoPlayer = $('#tutorialVideoModalPlayer');
+    const closeVideoModal = () => {
+      videoPlayer.pause();
+      videoPlayer.removeAttribute('src');
+      videoPlayer.load();
+      videoModal.hidden = true;
+    };
+    tutorial.addEventListener('click', (event) => {
+      const roleButton = event.target.closest('[data-tutorial-role]');
+      if (roleButton) {
+        const role = roleButton.dataset.tutorialRole;
+        $$('[data-tutorial-role]', tutorial).forEach((button) => {
+          const active = button === roleButton;
+          button.classList.toggle('is-active', active);
+          button.setAttribute('aria-selected', String(active));
+        });
+        $$('[data-tutorial-panel], [data-tutorial-steps]', tutorial).forEach((panel) => {
+          panel.hidden = panel.dataset.tutorialPanel !== role && panel.dataset.tutorialSteps !== role;
+        });
+        return;
+      }
+      const playButton = event.target.closest('[data-tutorial-play]');
+      if (playButton && playButton.dataset.tutorialPlay) {
+        videoPlayer.src = playButton.dataset.tutorialPlay;
+        videoModal.hidden = false;
+        videoPlayer.play().catch(() => {});
+      }
+    });
+    $('#tutorialVideoModalClose').addEventListener('click', closeVideoModal);
+    videoModal.addEventListener('click', (event) => {
+      if (event.target === videoModal) closeVideoModal();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !videoModal.hidden) closeVideoModal();
     });
   }
 
@@ -2270,10 +2254,11 @@
       if (cancel) renderProfile();
     });
     $$('[data-show-login]').forEach((button) => button.addEventListener('click', showSignIn));
+    initHomeTutorials();
     $('#backToHomeButton').addEventListener('click', showPublicHome);
     $('#themeToggle').addEventListener('click', toggleTheme);
     $('#refreshLoginCaptcha').addEventListener('click', refreshLoginCaptcha);
-    $('#loginForm').addEventListener('submit', login); $('#registrationForm').addEventListener('submit', registerStudent); $('#registrationProgram').addEventListener('change', renderRegistrationSections); $('#registrationYear').addEventListener('change', renderRegistrationSections); $('#scheduleTermFilter').addEventListener('change', changeScheduleTerm); $('#scheduleHistoryBody').addEventListener('click', (event) => { const sample = event.target.closest('[data-schedule-history-sample]'); if (sample) { viewSampleSchedule(Number(sample.dataset.scheduleHistorySample)); return; } const button = event.target.closest('[data-schedule-history-run]'); if (button) viewScheduleHistory(Number(button.dataset.scheduleHistoryRun)); }); $$('[data-password-toggle]').forEach((button) => button.addEventListener('click', () => togglePasswordVisibility(button))); $('#showRegistrationButton').addEventListener('click', showRegistration); $('#forgotPasswordButton').addEventListener('click', showForgotPassword); $('#backToLoginButton').addEventListener('click', () => showLogin('', true, true)); $('#backFromResetButton').addEventListener('click', () => showLogin('', true, true)); $('#sendRegistrationOtpButton').addEventListener('click', sendRegistrationOtp); $('#sendResetOtpButton').addEventListener('click', sendResetOtp); $('#forgotPasswordForm').addEventListener('submit', resetPassword); $('#logoutButton').addEventListener('click', logout); $('#menuButton').addEventListener('click', toggleSidebar); $('#sidebarBackdrop').addEventListener('click', closeSidebar);     $('#modalCloseButton').addEventListener('click', closeModal); $('#modalCancelButton').addEventListener('click', closeModal); $('#modalForm').addEventListener('submit', (event) => modalMode === 'edit-schedule' ? submitScheduleEditor(event) : modalMode === 'add-schedule' ? submitAddSchedule(event) : submitModal(event)); $('#generateButton').addEventListener('click', generate); $('#manualGenerateButton').addEventListener('click', openManualGenerationModal); $('#addScheduleButton').addEventListener('click', openAddScheduleModal); $('#dashboardGenerateButton').addEventListener('click', generate); $('#exportButton').addEventListener('click', exportSchedule); $('#reportExportButton').addEventListener('click', exportReport); $('#printButton').addEventListener('click', () => window.print()); $('#settingsForm').addEventListener('submit', saveSettings); $('#passwordForm').addEventListener('submit', changePassword); $('#requestEmailOtpButton').addEventListener('click', sendEmailChangeOtp); $('#emailChangeForm').addEventListener('submit', confirmEmailChange);
+    $('#loginForm').addEventListener('submit', login); $('#registrationForm').addEventListener('submit', registerStudent); $('#registrationProgram').addEventListener('change', renderRegistrationSections); $('#registrationYear').addEventListener('change', renderRegistrationSections); $('#scheduleTermFilter').addEventListener('change', changeScheduleTerm); $$('[data-password-toggle]').forEach((button) => button.addEventListener('click', () => togglePasswordVisibility(button))); $('#showRegistrationButton').addEventListener('click', showRegistration); $('#forgotPasswordButton').addEventListener('click', showForgotPassword); $('#backToLoginButton').addEventListener('click', () => showLogin('', true, true)); $('#backFromResetButton').addEventListener('click', () => showLogin('', true, true)); $('#sendRegistrationOtpButton').addEventListener('click', sendRegistrationOtp); $('#sendResetOtpButton').addEventListener('click', sendResetOtp); $('#forgotPasswordForm').addEventListener('submit', resetPassword); $('#logoutButton').addEventListener('click', logout); $('#menuButton').addEventListener('click', toggleSidebar); $('#sidebarBackdrop').addEventListener('click', closeSidebar);     $('#modalCloseButton').addEventListener('click', closeModal); $('#modalCancelButton').addEventListener('click', closeModal); $('#modalForm').addEventListener('submit', (event) => modalMode === 'edit-schedule' ? submitScheduleEditor(event) : modalMode === 'add-schedule' ? submitAddSchedule(event) : submitModal(event)); $('#generateButton').addEventListener('click', generate); $('#manualGenerateButton').addEventListener('click', openManualGenerationModal); $('#addScheduleButton').addEventListener('click', openAddScheduleModal); $('#dashboardGenerateButton').addEventListener('click', generate); $('#exportButton').addEventListener('click', exportSchedule); $('#reportExportButton').addEventListener('click', exportReport); $('#printButton').addEventListener('click', () => window.print()); $('#settingsForm').addEventListener('submit', saveSettings); $('#passwordForm').addEventListener('submit', changePassword); $('#requestEmailOtpButton').addEventListener('click', sendEmailChangeOtp); $('#emailChangeForm').addEventListener('submit', confirmEmailChange);
     $('#studentLinksButton').addEventListener('click', openStudentLinks); $('#studentLinksClose').addEventListener('click', () => $('#studentLinksDialog').close()); $('#studentLinksDialog').addEventListener('click', (event) => { if (event.target === $('#studentLinksDialog')) $('#studentLinksDialog').close(); });
     $('#globalSearch').addEventListener('input', (event) => { state.query = event.target.value; if (state.page === 'dashboard') renderDashboard(); if (state.page === 'schedules') renderSchedules(); if (state.page === 'data') renderData(); }); $('#scheduleViewFilter').addEventListener('change', (event) => { state.scheduleView = event.target.value; state.scheduleFilter = 'all'; renderSchedules(); }); $('#scheduleFilterValue').addEventListener('change', (event) => { state.scheduleFilter = event.target.value; renderSchedules(); }); $('#addRecordButton').addEventListener('click', () => openDataRecord(state.dataTab));
     $('#calendarWeekView').addEventListener('click', () => { state.calendarView = 'week'; renderSchedules(); });
