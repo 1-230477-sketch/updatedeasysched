@@ -166,7 +166,7 @@ const EASYSCHED_SCHOOL = 'New Sinai School and Colleges Sta. Rosa, Inc.';
                         </video>
                     </div>
                     <div class="tutorial-video-info">
-                        <div><h3>Faculty Dashboard &amp; Teaching Load Walkthrough</h3><p>How to set preferences, view assigned schedules, and report conflicts.</p></div>
+                        <div><h3>Faculty Schedule &amp; Room Requests Walkthrough</h3><p>How to view your assigned schedule and submit room or schedule change requests.</p></div>
                         <button class="tutorial-link" type="button" data-tutorial-play="assets/professor-tutorial.mp4">Play Full Video <span aria-hidden="true">&rarr;</span></button>
                     </div>
                 </article>
@@ -179,19 +179,19 @@ const EASYSCHED_SCHOOL = 'New Sinai School and Colleges Sta. Rosa, Inc.';
                         </video>
                     </div>
                     <div class="tutorial-video-info">
-                        <div><h3>Student Portal &amp; Timetable Viewer Guide</h3><p>How to check class schedules, room locations, and export calendar events.</p></div>
+                        <div><h3>Student Timetable Viewer Guide</h3><p>How to view your section's published classes, rooms, instructors, and times.</p></div>
                         <button class="tutorial-link" type="button" data-tutorial-play="assets/student-tutorial.mp4">Play Full Video <span aria-hidden="true">&rarr;</span></button>
                     </div>
                 </article>
                 <div class="tutorial-steps" data-tutorial-steps="faculty">
                     <h3><?= easysched_icon('checklist', '22') ?> Key Steps for Professors</h3>
-                    <p>Follow this quick breakdown to manage your teaching preferences and classes.</p>
-                    <ol><li><strong>Log in with Institutional Credentials</strong><span>Access your faculty account using your assigned email and password.</span></li><li><strong>Submit Time Availability &amp; Special Requests</strong><span>Specify your preferred teaching hours and laboratory room requirements.</span></li><li><strong>Review Generated Load Schedule</strong><span>Check for overlaps, subject allocations, and request adjustments with support.</span></li></ol>
+                    <p>Follow these steps to view your schedule and request approved changes.</p>
+                    <ol><li><strong>Sign in and open Overview</strong><span>Log in with your faculty account, then use Overview to access your EasySched workspace.</span></li><li><strong>Open My schedule</strong><span>Review your published subjects, sections, rooms, dates, and class times.</span></li><li><strong>Submit a Room request</strong><span>Request a room for a class date or propose a change to the day, time, or room for a published class.</span></li></ol>
                 </div>
                 <div class="tutorial-steps" data-tutorial-steps="student" hidden>
                     <h3><?= easysched_icon('checklist', '22') ?> Key Steps for Students</h3>
-                    <p>Everything you need to view and stay updated with your official timetable.</p>
-                    <ol><li><strong>Sign in to Student Account</strong><span>Use your student ID number or official school account to authenticate.</span></li><li><strong>View Weekly Class Matrix</strong><span>See class details, room numbers, professor names, and exact class times.</span></li><li><strong>Download or Sync to Mobile Calendar</strong><span>Sync schedules directly to Google Calendar or Apple Calendar for instant notifications.</span></li></ol>
+                    <p>Use these steps to find the published timetable for your assigned section.</p>
+                    <ol><li><strong>Sign in to your account</strong><span>Log in with your EasySched student account to open the student workspace.</span></li><li><strong>Open My section</strong><span>Use the My section page to access the timetable assigned to your section.</span></li><li><strong>Read your weekly timetable</strong><span>Check each subject's instructor, room, date, weekday, and class time.</span></li></ol>
                 </div>
             </div>
         </section>
