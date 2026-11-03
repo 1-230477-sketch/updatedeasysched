@@ -169,7 +169,6 @@ const EASYSCHED_SCHOOL = 'New Sinai School and Colleges Sta. Rosa, Inc.';
                         <div><h3>Faculty Dashboard &amp; Teaching Load Walkthrough</h3><p>How to set preferences, view assigned schedules, and report conflicts.</p></div>
                         <button class="tutorial-link" type="button" data-tutorial-play="assets/professor-tutorial.mp4">Play Full Video <span aria-hidden="true">&rarr;</span></button>
                     </div>
-                    <div class="tutorial-topics"><span>Topics covered:</span><b>Load Balancer</b><b>Room Preferences</b></div>
                 </article>
                 <article class="tutorial-video-card" id="tutorialStudentPanel" data-tutorial-panel="student" role="tabpanel" hidden>
                     <div class="tutorial-video-preview">
@@ -183,7 +182,6 @@ const EASYSCHED_SCHOOL = 'New Sinai School and Colleges Sta. Rosa, Inc.';
                         <div><h3>Student Portal &amp; Timetable Viewer Guide</h3><p>How to check class schedules, room locations, and export calendar events.</p></div>
                         <button class="tutorial-link" type="button" data-tutorial-play="assets/student-tutorial.mp4">Play Full Video <span aria-hidden="true">&rarr;</span></button>
                     </div>
-                    <div class="tutorial-topics"><span>Topics covered:</span><b>Class Lookup</b><b>iCal Export</b></div>
                 </article>
                 <div class="tutorial-steps" data-tutorial-steps="faculty">
                     <h3><?= easysched_icon('checklist', '22') ?> Key Steps for Professors</h3>
