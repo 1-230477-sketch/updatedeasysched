@@ -41,6 +41,8 @@ function easysched_icon(string $name, string $size = '20'): string
         'check' => '<path d="M5 12.5l4.2 4.2L19 7"/>',
         'clock' => '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
         'school' => '<path d="M2.5 9.5L12 4l9.5 5.5L12 15zM6 12v5c3.8 2.5 8.2 2.5 12 0v-5M21.5 9.5v6"/>',
+        'play' => '<path d="M9 7.5v9l7-4.5z" fill="currentColor" stroke="none"/>',
+        'checklist' => '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/>',
     ];
 
     $body = $paths[$name] ?? '';
@@ -55,7 +57,8 @@ $assetVersion = substr(
         . hash_file('sha256', __DIR__ . DIRECTORY_SEPARATOR . 'styles.css'),
     0,
     16
-);
+)
+    . '-tutorial-v2';
 $appBasePath = str_replace('\\', '/', dirname((string) ($_SERVER['SCRIPT_NAME'] ?? '/index.php')));
 if ($appBasePath === '.' || $appBasePath === '/') {
     $appBasePath = '';
@@ -95,6 +98,7 @@ const EASYSCHED_SCHOOL = 'New Sinai School and Colleges Sta. Rosa, Inc.';
             <nav class="home-nav" aria-label="Main navigation">
                 <a href="#homeTop">Home</a>
                 <a href="#homeFeatures">Features</a>
+                <a href="#homeTutorials">Tutorials</a>
                 <a href="#homeAbout">About</a>
                 <a href="#homeContact">Contact</a>
             </nav>
@@ -140,6 +144,60 @@ const EASYSCHED_SCHOOL = 'New Sinai School and Colleges Sta. Rosa, Inc.';
                 <li><span class="home-step-icon" aria-hidden="true"><?= easysched_icon('settings', '23') ?></span><h3>Generate Schedule</h3><p>Let the system create the optimal class schedule.</p></li>
                 <li><span class="home-step-icon" aria-hidden="true"><?= easysched_icon('eye', '23') ?></span><h3>Review &amp; Manage</h3><p>Check, adjust, and manage your schedule as needed.</p></li>
             </ol>
+        </section>
+
+        <section class="home-tutorials" id="homeTutorials" aria-labelledby="tutorialsTitle">
+            <div class="home-section-heading home-section-heading-inverse">
+                <p class="home-eyebrow">On-demand video learning</p>
+                <h2 id="tutorialsTitle">Video Tutorials &amp; Walkthrough Guides</h2>
+                <p>Learn how to navigate EasySched efficiently. Select your account type to view the most useful steps.</p>
+            </div>
+            <div class="tutorial-role-switcher" role="tablist" aria-label="Tutorial audience">
+                <button class="tutorial-role-button is-active" type="button" role="tab" aria-selected="true" aria-controls="tutorialFacultyPanel" data-tutorial-role="faculty"><?= easysched_icon('users', '17') ?>Professor / Faculty Account</button>
+                <button class="tutorial-role-button" type="button" role="tab" aria-selected="false" aria-controls="tutorialStudentPanel" data-tutorial-role="student"><?= easysched_icon('school', '17') ?>Student Account</button>
+            </div>
+            <div class="tutorial-content">
+                <article class="tutorial-video-card" id="tutorialFacultyPanel" data-tutorial-panel="faculty" role="tabpanel">
+                    <div class="tutorial-video-preview">
+                        <span class="tutorial-label"><?= easysched_icon('users', '14') ?> Faculty Guide</span>
+                        <video class="tutorial-video" controls preload="metadata" playsinline aria-label="Faculty dashboard and teaching load walkthrough">
+                            <source src="assets/professor-tutorial.mp4" type="video/mp4">
+                            Your browser does not support HTML video.
+                        </video>
+                        <span class="tutorial-duration">04:45</span>
+                    </div>
+                    <div class="tutorial-video-info">
+                        <div><h3>Faculty Dashboard &amp; Teaching Load Walkthrough</h3><p>How to set preferences, view assigned schedules, and report conflicts.</p></div>
+                        <button class="tutorial-link" type="button" data-tutorial-play="assets/professor-tutorial.mp4">Play Full Video <span aria-hidden="true">&rarr;</span></button>
+                    </div>
+                    <div class="tutorial-topics"><span>Topics covered:</span><b>Load Balancer</b><b>Room Preferences</b></div>
+                </article>
+                <article class="tutorial-video-card" id="tutorialStudentPanel" data-tutorial-panel="student" role="tabpanel" hidden>
+                    <div class="tutorial-video-preview">
+                        <span class="tutorial-label"><?= easysched_icon('school', '14') ?> Student Guide</span>
+                        <video class="tutorial-video" controls preload="metadata" playsinline aria-label="Student portal and timetable viewer walkthrough">
+                            <source src="assets/student-tutorial.mp4" type="video/mp4">
+                            Your browser does not support HTML video.
+                        </video>
+                        <span class="tutorial-duration">03:20</span>
+                    </div>
+                    <div class="tutorial-video-info">
+                        <div><h3>Student Portal &amp; Timetable Viewer Guide</h3><p>How to check class schedules, room locations, and export calendar events.</p></div>
+                        <button class="tutorial-link" type="button" data-tutorial-play="assets/student-tutorial.mp4">Play Full Video <span aria-hidden="true">&rarr;</span></button>
+                    </div>
+                    <div class="tutorial-topics"><span>Topics covered:</span><b>Class Lookup</b><b>iCal Export</b></div>
+                </article>
+                <div class="tutorial-steps" data-tutorial-steps="faculty">
+                    <h3><?= easysched_icon('checklist', '22') ?> Key Steps for Professors</h3>
+                    <p>Follow this quick breakdown to manage your teaching preferences and classes.</p>
+                    <ol><li><strong>Log in with Institutional Credentials</strong><span>Access your faculty account using your assigned email and password.</span></li><li><strong>Submit Time Availability &amp; Special Requests</strong><span>Specify your preferred teaching hours and laboratory room requirements.</span></li><li><strong>Review Generated Load Schedule</strong><span>Check for overlaps, subject allocations, and request adjustments with support.</span></li></ol>
+                </div>
+                <div class="tutorial-steps" data-tutorial-steps="student" hidden>
+                    <h3><?= easysched_icon('checklist', '22') ?> Key Steps for Students</h3>
+                    <p>Everything you need to view and stay updated with your official timetable.</p>
+                    <ol><li><strong>Sign in to Student Account</strong><span>Use your student ID number or official school account to authenticate.</span></li><li><strong>View Weekly Class Matrix</strong><span>See class details, room numbers, professor names, and exact class times.</span></li><li><strong>Download or Sync to Mobile Calendar</strong><span>Sync schedules directly to Google Calendar or Apple Calendar for instant notifications.</span></li></ol>
+                </div>
+            </div>
         </section>
 
         <section class="home-about" id="homeAbout" aria-labelledby="aboutTitle">
@@ -496,15 +554,6 @@ const EASYSCHED_SCHOOL = 'New Sinai School and Colleges Sta. Rosa, Inc.';
                             </table>
                         </div>
                     </article>
-                    <article class="panel schedule-history-panel student-hidden">
-                        <div class="panel-heading"><div><p class="eyebrow">Saved schedule versions</p><h3>Schedule history</h3><p class="muted">Open previously published schedules. Any sample schedule is illustrative only and is not a real historical record.</p></div></div>
-                        <div class="table-wrap">
-                            <table class="data-table">
-                                <thead><tr><th>Academic term</th><th>Saved</th><th>Classes</th><th>Status</th><th>Action</th></tr></thead>
-                                <tbody id="scheduleHistoryBody"><tr><td colspan="5">Loading schedule history…</td></tr></tbody>
-                            </table>
-                        </div>
-                    </article>
                     <div class="print-signatures" aria-hidden="true">
                         <div><span class="signature-line"></span>Prepared by</div>
                         <div><span class="signature-line"></span>Checked by</div>
@@ -709,6 +758,16 @@ const EASYSCHED_SCHOOL = 'New Sinai School and Colleges Sta. Rosa, Inc.';
         <section class="brand-popup-card" role="dialog" aria-modal="true" aria-label="EasySched information">
             <button class="icon-button brand-popup-close" id="brandPopupClose" type="button" aria-label="Close EasySched information"><?= easysched_icon('close', '18') ?></button>
             <img class="brand-popup-image" src="assets/easysched-splash.webp" alt="Powered by EasySched. Automated Scheduling System. More About Us. App Version 1.0. Copyright 2026 Easy Sched.">
+        </section>
+    </div>
+
+    <div class="tutorial-video-modal" id="tutorialVideoModal" hidden>
+        <section class="tutorial-video-modal-card" role="dialog" aria-modal="true" aria-labelledby="tutorialVideoModalTitle">
+            <div class="tutorial-video-modal-header">
+                <h2 id="tutorialVideoModalTitle">Tutorial walkthrough</h2>
+                <button class="icon-button" id="tutorialVideoModalClose" type="button" aria-label="Close tutorial video"><?= easysched_icon('close', '18') ?></button>
+            </div>
+            <video id="tutorialVideoModalPlayer" controls playsinline></video>
         </section>
     </div>
 
