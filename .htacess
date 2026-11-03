@@ -1,0 +1,23 @@
+Options -Indexes
+DirectorySlash On
+DirectoryIndex index.php
+
+<FilesMatch "(^\\.|^\\.env|^test-api\\.php$|^test-bootstrap\\.html$|^debug_student_fix\\.php$)">
+    Require all denied
+</FilesMatch>
+
+RewriteEngine On
+RewriteRule (^|/)\. - [F]
+RewriteCond %{HTTP_HOST} ^easysched\.tech$ [NC]
+RewriteRule ^ https://www.easysched.tech%{REQUEST_URI} [R=301,L,NE]
+RewriteRule ^data/?$ index.php [QSA,L]
+RewriteRule ^data/ - [F,L]
+
+# The browser uses these paths as client-side application routes. Keep them
+# on the PHP front controller so refreshing a route does not ask Apache for a
+# physical directory or file.
+RewriteRule ^(?:login|register|forgot-password|dashboard|overview|schedules?|room-requests|data|reports|profile|settings|help|audit-logs)/?$ index.php [QSA,L,NC]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [QSA,L]
