@@ -164,7 +164,6 @@ const EASYSCHED_SCHOOL = 'New Sinai School and Colleges Sta. Rosa, Inc.';
                             <source src="assets/professor-tutorial.mp4" type="video/mp4">
                             Your browser does not support HTML video.
                         </video>
-                        <span class="tutorial-duration">04:45</span>
                     </div>
                     <div class="tutorial-video-info">
                         <div><h3>Faculty Dashboard &amp; Teaching Load Walkthrough</h3><p>How to set preferences, view assigned schedules, and report conflicts.</p></div>
@@ -179,7 +178,6 @@ const EASYSCHED_SCHOOL = 'New Sinai School and Colleges Sta. Rosa, Inc.';
                             <source src="assets/student-tutorial.mp4" type="video/mp4">
                             Your browser does not support HTML video.
                         </video>
-                        <span class="tutorial-duration">03:20</span>
                     </div>
                     <div class="tutorial-video-info">
                         <div><h3>Student Portal &amp; Timetable Viewer Guide</h3><p>How to check class schedules, room locations, and export calendar events.</p></div>

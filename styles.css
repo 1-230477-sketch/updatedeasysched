@@ -654,9 +654,8 @@ kbd {
 .tutorial-video-preview { position: relative; min-height: 250px; overflow: hidden; background: #071d27; }
 .tutorial-video-preview::after { position: absolute; inset: 0; content: ""; background: linear-gradient(0deg, rgba(2, 27, 24, .93), rgba(2, 27, 24, .08) 65%); pointer-events: none; }
 .tutorial-video { display: block; width: 100% !important; height: 340px !important; max-height: 340px !important; object-fit: contain; background: #071d27; }
-.tutorial-label, .tutorial-duration { position: absolute; z-index: 1; top: 13px; border-radius: 4px; background: rgba(8, 118, 94, .8); color: #bdf8e3; font-size: 11px; font-weight: 800; letter-spacing: .03em; }
+.tutorial-label { position: absolute; z-index: 1; top: 13px; border-radius: 4px; background: rgba(8, 118, 94, .8); color: #bdf8e3; font-size: 11px; font-weight: 800; letter-spacing: .03em; }
 .tutorial-label { left: 13px; display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; }
-.tutorial-duration { right: 13px; top: auto; bottom: 13px; padding: 4px 7px; color: #91f2d4; }
 .tutorial-play-button { position: absolute; z-index: 2; top: 50%; left: 50%; display: grid; width: 62px; height: 62px; place-items: center; border-radius: 50%; background: #55dcc8; color: #073d35; transform: translate(-50%, -50%); box-shadow: 0 5px 16px rgba(0, 0, 0, .22); }
 .tutorial-play-button:hover { background: #7ee9d7; transform: translate(-50%, -50%) scale(1.06); }
 .tutorial-video-info { display: flex; align-items: end; justify-content: space-between; gap: 18px; padding: 16px 14px 13px; }

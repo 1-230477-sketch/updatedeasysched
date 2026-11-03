@@ -2162,6 +2162,26 @@
     if (!tutorial) return;
     const videoModal = $('#tutorialVideoModal');
     const videoPlayer = $('#tutorialVideoModalPlayer');
+    const stopTutorialVideos = () => {
+      $$('.tutorial-video', tutorial).forEach((video) => {
+        video.pause();
+        video.currentTime = 0;
+      });
+    };
+    const stopWhenPageIsInactive = () => {
+      if (document.hidden) stopTutorialVideos();
+    };
+    const videoVisibilityObserver = 'IntersectionObserver' in window
+      ? new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) {
+            entry.target.pause();
+            entry.target.currentTime = 0;
+          }
+        });
+      }, { threshold: 0.25 })
+      : null;
+    $$('.tutorial-video', tutorial).forEach((video) => videoVisibilityObserver?.observe(video));
     const closeVideoModal = () => {
       videoPlayer.pause();
       videoPlayer.removeAttribute('src');
@@ -2172,6 +2192,7 @@
       const roleButton = event.target.closest('[data-tutorial-role]');
       if (roleButton) {
         const role = roleButton.dataset.tutorialRole;
+        stopTutorialVideos();
         $$('[data-tutorial-role]', tutorial).forEach((button) => {
           const active = button === roleButton;
           button.classList.toggle('is-active', active);
@@ -2193,6 +2214,8 @@
     videoModal.addEventListener('click', (event) => {
       if (event.target === videoModal) closeVideoModal();
     });
+    document.addEventListener('visibilitychange', stopWhenPageIsInactive);
+    window.addEventListener('pagehide', stopTutorialVideos);
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && !videoModal.hidden) closeVideoModal();
     });
