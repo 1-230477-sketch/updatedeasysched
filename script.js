@@ -3,13 +3,13 @@
 
   const NAV = {
     admin: [
-      ['dashboard', 'Overview'], ['schedules', 'Schedule'], ['data', 'Academic setup'], ['room-requests', 'Room requests'], ['reports', 'Reports'], ['audit-logs', 'Security & Audit Logs'], ['profile', 'Profile'], ['settings', 'Settings'], ['help', 'Help']
+      ['dashboard', 'Overview'], ['schedules', 'Schedule'], ['data', 'Academic setup'], ['room-requests', 'Request'], ['reports', 'Reports'], ['audit-logs', 'Security & Audit Logs'], ['profile', 'Profile'], ['settings', 'Settings'], ['help', 'Help']
     ],
     scheduler: [
       ['dashboard', 'Overview'], ['schedules', 'Schedule'], ['data', 'Academic setup'], ['reports', 'Reports'], ['profile', 'Profile'], ['settings', 'Settings'], ['help', 'Help']
     ],
     instructor: [
-      ['dashboard', 'Overview'], ['schedules', 'My schedule'], ['room-requests', 'Room requests'], ['profile', 'Profile'], ['settings', 'Settings'], ['help', 'Help']
+      ['dashboard', 'Overview'], ['schedules', 'My schedule'], { id: 'request', label: 'Request', icon: 'room-requests', children: [['request-room', 'Request a room and time'], ['request-change', 'Request a schedule change']] }, ['profile', 'Profile'], ['settings', 'Settings'], ['help', 'Help']
     ],
     student: [
       ['dashboard', 'Overview'], ['schedules', 'My section'], ['profile', 'Profile'], ['settings', 'Settings'], ['help', 'Help']
@@ -18,7 +18,9 @@
   const PAGE_META = {
     dashboard: ['Overview', 'Command center'],
     schedules: ['Published timetable', 'Timetable'],
-    'room-requests': ['Instructor tools', 'Room requests'],
+    'room-requests': ['Instructor requests', 'Request'],
+    'request-room': ['Instructor request', 'Request a room and time'],
+    'request-change': ['Instructor request', 'Request a schedule change'],
     data: ['Master data', 'Academic records'],
     reports: ['Evidence and review', 'Validation reports'],
     profile: ['Account', 'Profile'],
@@ -35,6 +37,8 @@
     dashboard: 'dashboard',
     schedules: 'schedules',
     'room-requests': 'room-requests',
+    'request-room': 'request-room',
+    'request-change': 'request-change',
     data: 'data',
     reports: 'reports',
     profile: 'profile',
@@ -75,6 +79,9 @@
     help: svgIcon(PATH.book),
     'audit-logs': svgIcon(PATH.shield)
   };
+  function navPageIds(roleName = role()) {
+    return (NAV[roleName] || []).flatMap((entry) => Array.isArray(entry) ? [entry[0]] : entry.children.map(([id]) => id));
+  }
   const METRIC_ICONS = {
     'Active class assignments': PATH.book,
     'Published classes': PATH.calendarCheck,
@@ -451,7 +458,7 @@
   function handleRouteChange() {
     const route = readRoute();
     if (state.snapshot) {
-      if ((NAV[role()] || []).some(([id]) => id === route)) {
+      if (navPageIds().includes(route)) {
         navigate(route, false);
       } else {
         state.page = 'dashboard';
@@ -624,8 +631,39 @@
   function buildNavigation() {
     const nav = $('#navList');
     nav.replaceChildren();
-    (NAV[role()] || []).forEach(([id, label]) => {
+    (NAV[role()] || []).forEach((entry) => {
       const item = document.createElement('li');
+      if (!Array.isArray(entry)) {
+        item.className = 'nav-group is-expanded';
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.dataset.navGroupToggle = entry.id;
+        toggle.setAttribute('aria-expanded', 'true');
+        const groupActive = entry.children.some(([id]) => id === state.page);
+        toggle.className = groupActive ? 'active' : '';
+        toggle.innerHTML = `<span class="nav-icon" aria-hidden="true">${ICONS[entry.icon]}</span><span>${esc(entry.label)}</span><span class="nav-chevron" aria-hidden="true">⌄</span>`;
+        const children = document.createElement('ul');
+        children.className = 'nav-sublist';
+        entry.children.forEach(([id, label]) => {
+          const childItem = document.createElement('li');
+          const childButton = document.createElement('button');
+          childButton.type = 'button';
+          childButton.dataset.navigate = id;
+          childButton.className = id === state.page ? 'active' : '';
+          childButton.setAttribute('aria-current', id === state.page ? 'page' : 'false');
+          childButton.innerHTML = `<span>${esc(label)}</span>`;
+          childItem.append(childButton);
+          children.append(childItem);
+        });
+        toggle.addEventListener('click', () => {
+          const expanded = item.classList.toggle('is-expanded');
+          toggle.setAttribute('aria-expanded', String(expanded));
+        });
+        item.append(toggle, children);
+        nav.append(item);
+        return;
+      }
+      const [id, label] = entry;
       const button = document.createElement('button');
       button.type = 'button'; button.dataset.navigate = id; button.className = id === state.page ? 'active' : '';
       button.setAttribute('aria-current', id === state.page ? 'page' : 'false');
@@ -635,7 +673,7 @@
   }
 
   function navigate(page, updateRoute = true) {
-    if (!(NAV[role()] || []).some(([id]) => id === page)) return;
+    if (!navPageIds().includes(page)) return;
     if (updateRoute) setRoute(page);
     if (state.page !== page) {
       state.query = '';
@@ -643,11 +681,21 @@
     }
     state.page = page;
     $('#appView').classList.toggle('dashboard-active', page === 'dashboard');
-    $$('.page').forEach((section) => { section.hidden = section.dataset.page !== page; });
-    const activePage = $(`#page-${page}`);
+    const visiblePage = ['request-room', 'request-change'].includes(page) ? 'room-requests' : page;
+    $$('.page').forEach((section) => { section.hidden = section.dataset.page !== visiblePage; });
+    const activePage = $(`#page-${visiblePage}`);
     activePage?.classList.remove('page-enter');
     if (activePage) requestAnimationFrame(() => activePage.classList.add('page-enter'));
-    $$('#navList button').forEach((button) => { const active = button.dataset.navigate === page; button.classList.toggle('active', active); button.setAttribute('aria-current', active ? 'page' : 'false'); });
+    $$('#navList button[data-navigate]').forEach((button) => { const active = button.dataset.navigate === page; button.classList.toggle('active', active); button.setAttribute('aria-current', active ? 'page' : 'false'); });
+    $$('#navList .nav-group').forEach((group) => {
+      const containsPage = Array.from(group.querySelectorAll('[data-navigate]')).some((button) => button.dataset.navigate === page);
+      group.classList.toggle('active', containsPage);
+      group.querySelector('[data-nav-group-toggle]').classList.toggle('active', containsPage);
+      if (containsPage) {
+        group.classList.add('is-expanded');
+        group.querySelector('[data-nav-group-toggle]').setAttribute('aria-expanded', 'true');
+      }
+    });
     const [eyebrow, title] = PAGE_META[page]; $('#pageEyebrow').textContent = eyebrow; $('#pageTitle').textContent = title;
     document.title = `${title} | EasySched`;
     announce(`${title} page loaded.`);
@@ -667,7 +715,7 @@
     if (page === 'schedules') {
       renderSchedules();
     }
-    if (page === 'room-requests') renderRoomRequests();
+    if (['room-requests', 'request-room', 'request-change'].includes(page)) renderRoomRequests();
     if (page === 'data') renderData();
     if (page === 'reports') renderReports();
     if (page === 'profile') renderProfile();
@@ -698,7 +746,7 @@
     selectedScheduleIsSample = false;
     scheduleTermRequestId += 1;
     scheduleTermLoading = false;
-    if (!(NAV[snapshot.user.role] || []).some(([id]) => id === state.page)) state.page = 'dashboard';
+    if (!navPageIds(snapshot.user.role).includes(state.page)) state.page = 'dashboard';
     setRoute(state.page, true);
     showApp();
   }
@@ -752,7 +800,7 @@
       : role() === 'instructor'
         ? [
           { page: 'schedules', icon: PATH.calendar, label: 'View my schedule' },
-          { page: 'room-requests', icon: PATH.calendarCheck, label: 'Request a room' }
+          { page: 'request-room', icon: PATH.calendarCheck, label: 'Request a room' }
         ]
         : [{ page: 'schedules', icon: PATH.calendar, label: 'View my section' }];
     if (canManage()) quickActions.unshift(
@@ -944,9 +992,9 @@
     const instructorPanel = $('#scheduleRequestPanel');
     const changePanel = $('#scheduleChangePanel');
     const reviewPanel = $('#scheduleRequestReviewPanel');
-    if (instructorPanel) instructorPanel.hidden = role() !== 'instructor';
-    if (changePanel) changePanel.hidden = role() !== 'instructor';
-    if (reviewPanel) reviewPanel.hidden = !canAdmin();
+    if (instructorPanel) instructorPanel.hidden = role() !== 'instructor' || state.page !== 'request-room';
+    if (changePanel) changePanel.hidden = role() !== 'instructor' || state.page !== 'request-change';
+    if (reviewPanel) reviewPanel.hidden = !canAdmin() || state.page !== 'room-requests';
     if (role() === 'instructor') {
       const offerings = state.snapshot.offerings || [];
       $('#requestOffering').innerHTML = `${offerings.map((item) => `<option value="${Number(item.id)}">${esc(item.subject_name)} - ${esc(item.section_code)}</option>`).join('')}<option value="other">Others</option>`;
@@ -1085,7 +1133,17 @@
   function setRoomAvailabilityStatus(message, tone = 'muted') { const status = $('#roomAvailabilityStatus'); if (!status) return; status.textContent = message; status.className = `availability-status ${tone}`; $('#submitRoomRequestButton').disabled = tone !== 'health-ok' || !$('#requestRoom').value; }
   function invalidateRoomAvailability() { roomAvailabilityCheckId++; window.clearTimeout(roomAvailabilityTimer); availableRoomsReady = false; roomRequestAllowed = false; $('#requestRoom').innerHTML = '<option value="">Finding available rooms...</option>'; $('#submitRoomRequestButton').disabled = true; try { roomRequestPayload(); roomAvailabilityTimer = window.setTimeout(refreshAvailableRooms, 250); setRoomAvailabilityStatus('Finding available rooms...'); } catch (error) { $('#requestRoom').innerHTML = '<option value="">Choose a date and time first</option>'; setRoomAvailabilityStatus(error.message); } }
   async function refreshAvailableRooms() { const checkId = ++roomAvailabilityCheckId; try { const result = await request('available_rooms', { method: 'POST', body: roomRequestPayload() }); if (checkId !== roomAvailabilityCheckId) return; const rooms = result.rooms || []; const blockers = result.request_blockers || []; const select = $('#requestRoom'); const selectedRoom = select.value; select.innerHTML = rooms.length ? rooms.map((room) => `<option value="${Number(room.id)}">${esc(room.code)} - ${esc(room.name)} (${esc(room.room_type)})</option>`).join('') : '<option value="">No rooms available</option>'; if (rooms.some((room) => Number(room.id) === Number(selectedRoom))) select.value = selectedRoom; availableRoomsReady = rooms.length > 0; roomRequestAllowed = availableRoomsReady && blockers.length === 0; const conflictText = blockers.map((item) => `${item.description} (${requestTimeLabel({ request_start_time: item.start_time, requested_end_time: item.end_time })})`).join('; '); const message = blockers.length ? `${rooms.length ? `${rooms.length} room${rooms.length === 1 ? '' : 's'} are free, but this request cannot be submitted` : 'No rooms available for the selected time'}. ${conflictText}` : rooms.length ? `${rooms.length} room${rooms.length === 1 ? '' : 's'} available for the selected time.` : 'No rooms available for the selected time.'; setRoomAvailabilityStatus(message, roomRequestAllowed ? 'health-ok' : 'health-warn'); } catch (error) { if (checkId === roomAvailabilityCheckId) { availableRoomsReady = false; roomRequestAllowed = false; $('#requestRoom').innerHTML = '<option value="">Availability could not be loaded</option>'; setRoomAvailabilityStatus(error.message, 'health-error'); } } }
-  function renderRoomRequests() { renderScheduleRequests(); }
+  function renderRoomRequests() {
+    const isRoomRequest = state.page === 'request-room';
+    const isScheduleChange = state.page === 'request-change';
+    $('#roomRequestsHeading').textContent = isRoomRequest ? 'Request a room and time' : isScheduleChange ? 'Request a schedule change' : 'Request';
+    $('#roomRequestsDescription').textContent = isRoomRequest
+      ? 'Request a room for a specific class date and time. An administrator must approve your request.'
+      : isScheduleChange
+        ? 'Propose a different day, time, or room for one of your published classes. An administrator must approve the change.'
+        : 'Review pending room and schedule requests.';
+    renderScheduleRequests();
+  }
 
   async function requestSchedule(event) { event.preventDefault(); let payload; try { payload = roomRequestPayload(); } catch (error) { setRoomAvailabilityStatus(error.message, 'health-error'); return; } if (!availableRoomsReady || !payload.room_id) { setRoomAvailabilityStatus('Choose an available room before submitting.', 'health-error'); return; } if (!roomRequestAllowed) { setRoomAvailabilityStatus('Resolve the instructor or class schedule conflict before submitting.', 'health-error'); return; } try { const result = await request('request_schedule', { method: 'POST', body: { ...payload, note: $('#requestNote').value } }); applySnapshot(result.snapshot); showToast('Request submitted', 'Your room request is waiting for administrator approval.'); invalidateRoomAvailability(); } catch (error) { const conflict = error.details?.conflicts?.[0]; const message = conflict ? `Conflict: this room is occupied from ${requestTimeLabel({ request_start_time: conflict.start_time, requested_end_time: conflict.end_time })} (${conflict.description}).` : error.message; availableRoomsReady = false; roomRequestAllowed = false; setRoomAvailabilityStatus(message, 'health-error'); showToast('Could not submit request', message, 'error'); } }
   async function requestScheduleChange(event) {
@@ -2425,7 +2483,7 @@
       if (state.snapshot && state.page === 'dashboard') renderDashboard();
     }, 30000);
     const initialRoute = readRoute();
-    if ((NAV.admin || []).some(([id]) => id === initialRoute)) state.page = initialRoute;
+    if (navPageIds('admin').includes(initialRoute) || navPageIds('instructor').includes(initialRoute)) state.page = initialRoute;
     if (initialRoute === 'login') showLogin('', false);
     if (initialRoute === 'register') await showRegistration(false);
     if (initialRoute === 'forgot-password') showForgotPassword(false);
@@ -2436,7 +2494,7 @@
       applySnapshot(result);
     } catch (error) {
       if (error.status === 401) {
-        if ((NAV.admin || []).some(([id]) => id === initialRoute)) {
+        if (navPageIds('admin').includes(initialRoute) || navPageIds('instructor').includes(initialRoute)) {
           showLogin('', false);
           setRoute('login', true);
         }

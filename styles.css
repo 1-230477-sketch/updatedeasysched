@@ -1188,6 +1188,15 @@ kbd {
 .nav-icon svg { width: 17px; height: 17px; }
 .nav-list button:hover .nav-icon,
 .nav-list button.active .nav-icon { color: var(--accent); }
+.nav-group { margin: 0; }
+.nav-list .nav-group > button { justify-content: flex-start; }
+.nav-chevron { margin-left: auto; font-size: 15px; line-height: 1; transition: transform var(--fast) ease; }
+.nav-group.is-expanded > button .nav-chevron { transform: rotate(180deg); }
+.nav-sublist { display: none; margin: 2px 0 5px 18px; padding: 0 0 0 10px; border-left: 1px solid var(--border); list-style: none; }
+.nav-group.is-expanded .nav-sublist { display: block; }
+.nav-sublist button { min-height: 34px; padding: 7px 10px; border-radius: 8px; color: var(--text-muted); font-size: 12.5px; font-weight: 500; }
+.nav-sublist button.active { color: var(--text); font-weight: 700; }
+.nav-sublist button.active::before { height: 14px; }
 
 .sidebar-footer {
   display: flex;

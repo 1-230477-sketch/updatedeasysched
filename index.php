@@ -558,7 +558,7 @@ const EASYSCHED_SCHOOL = 'New Sinai School and Colleges Sta. Rosa, Inc.';
                 </section>
 
                 <section class="page" id="page-room-requests" data-page="room-requests" aria-labelledby="roomRequestsHeading" hidden>
-                    <div class="page-heading"><div><p class="eyebrow"></p><h2 id="roomRequestsHeading">Room requests</h2><p class="muted">Request a room for a specific class date, or propose a day, time, and room change for a published class. An administrator must approve each request.</p></div></div>
+                    <div class="page-heading"><div><p class="eyebrow"></p><h2 id="roomRequestsHeading">Request</h2><p class="muted" id="roomRequestsDescription">Review pending room and schedule requests.</p></div></div>
                     <article class="panel instructor-only" id="scheduleRequestPanel" hidden>
                         <div class="panel-heading"><div><p class="eyebrow">Instructor request</p><h3>Request a room and time</h3></div></div>
                         <form id="scheduleRequestForm" class="form-grid" method="post">
