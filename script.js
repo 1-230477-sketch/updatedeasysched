@@ -1636,11 +1636,17 @@
       ].join('');
     }
     $('#constraintReport').innerHTML = Object.entries(validation?.checks || {}).map(([item, passed]) => `<div class="constraint-row"><span class="constraint-status ${passed ? '' : 'health-error'}">${passed ? 'PASS' : 'FAIL'}</span><span>${esc(item.replaceAll('_', ' '))}</span></div>`).join('') || emptyState('No published run', 'Constraint evidence appears after a successful generation.');
-    $('#roomReport').innerHTML = state.snapshot.rooms.length
-      ? state.snapshot.rooms.map((room) => { const count = roomCounts.get(room.code) || 0; return `<div class="bar-row"><span class="bar-label" title="${esc(room.name)}">${esc(room.code)}</span><div class="bar-track"><div class="bar-fill" data-fill="${Math.round((count / max) * 100)}"></div></div><strong>${count}</strong></div>`; }).join('')
+    const roomRows = state.snapshot.rooms.map((room) => ({
+      room,
+      count: roomCounts.get(room.code) || 0,
+      type: scheduleTypeClass(room.room_type)
+    })).sort((left, right) => right.count - left.count || left.room.code.localeCompare(right.room.code));
+    const axisMax = Math.max(4, Math.ceil(max / 4) * 4);
+    const axisTicks = Array.from({ length: 5 }, (_, index) => Math.round(axisMax * index / 4));
+    $('#roomReport').innerHTML = roomRows.length
+      ? `<div class="room-chart-legend" aria-label="Room type legend">${[['lecture', 'Lecture'], ['lab', 'Lab'], ['other', 'Special']].map(([type, label]) => `<span><i class="room-type-key type-${type}" aria-hidden="true"></i>${label}</span>`).join('')}</div><div class="room-chart-layout"><span class="room-chart-y-axis" aria-hidden="true">Rooms</span><div class="room-chart-plot"><div class="room-chart-rows" role="list" aria-label="Scheduled classes by room">${roomRows.map(({ room, count, type }) => `<div class="bar-row" role="listitem"><span class="bar-label" title="${esc(room.name)}"><strong>${esc(room.code)}</strong><small>${scheduleTypeLabel(room.room_type)}</small></span><div class="bar-track" role="img" aria-label="${esc(room.code)}: ${count} scheduled class${count === 1 ? '' : 'es'}"><div class="bar-fill type-${type}" data-fill="${Math.round((count / axisMax) * 100)}"></div></div><strong class="bar-value">${count}</strong></div>`).join('')}</div><div class="room-chart-scale" aria-hidden="true"><span></span><div>${axisTicks.map((tick) => `<span>${tick}</span>`).join('')}</div><span></span></div><div class="room-chart-x-axis" aria-hidden="true"><span></span><strong>Scheduled class meetings</strong><span></span></div></div></div>`
       : emptyState('No rooms configured', 'Add rooms under Academic setup to measure utilization.');
-    // Widths are applied through the CSSOM: the content security policy has no
-    // 'unsafe-inline', so a style="" attribute in this markup would be dropped.
+    // Widths are applied through the CSSOM because inline style attributes are blocked by CSP.
     $$('#roomReport .bar-fill').forEach((bar) => { bar.style.width = `${bar.dataset.fill}%`; });
   }
 
