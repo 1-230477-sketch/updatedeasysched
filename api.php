@@ -258,6 +258,8 @@ function audit_successful_api_transaction(array $payload, int $status): void
         'save_schedule' => 'schedule',
         'add_schedule' => 'schedule',
         'delete_schedule' => 'schedule',
+        'clear_schedule' => 'schedule_run',
+        'import_schedule' => 'schedule_run',
         'save_master' => (string) (($input['entity'] ?? '') ?: 'master_data'),
         'review_registration' => 'pending_registration',
         'request_schedule' => 'schedule_request',
@@ -3386,6 +3388,179 @@ function import_offerings_csv(PDO $pdo, array $user, array $input): array
     }
 }
 
+function import_schedule_csv(PDO $pdo, array $user, array $input): array
+{
+    $csv = $input['csv'] ?? null;
+    if (!is_string($csv) || trim($csv) === '') {
+        throw new ApiError(422, 'Choose a non-empty schedule CSV file.');
+    }
+    if (strlen($csv) > 2000000) {
+        throw new ApiError(413, 'The schedule CSV file must be 2 MB or smaller.');
+    }
+
+    $stream = fopen('php://temp', 'r+');
+    if ($stream === false) {
+        throw new RuntimeException('Could not open the schedule CSV import stream.');
+    }
+    fwrite($stream, $csv);
+    rewind($stream);
+    $headers = fgetcsv($stream, null, ',', '"', '\\');
+    if (!is_array($headers)) {
+        fclose($stream);
+        throw new ApiError(422, 'The schedule CSV file must start with a header row.');
+    }
+    $headers[0] = preg_replace('/^\xEF\xBB\xBF/', '', (string) $headers[0]) ?? (string) $headers[0];
+    $headers = array_map(static fn($header): string => strtolower(trim((string) $header)), $headers);
+    $requiredHeaders = ['subject code', 'section', 'room', 'day', 'time'];
+    if (count($headers) !== count(array_unique($headers)) || array_diff($requiredHeaders, $headers)) {
+        fclose($stream);
+        throw new ApiError(422, 'CSV headers must include: ' . implode(', ', $requiredHeaders) . '. Export a schedule CSV to get the supported format.');
+    }
+
+    $headerPositions = array_flip($headers);
+    $records = [];
+    $lineNumber = 1;
+    while (($values = fgetcsv($stream, null, ',', '"', '\\')) !== false) {
+        $lineNumber++;
+        if (count($values) === 1 && trim((string) ($values[0] ?? '')) === '') {
+            continue;
+        }
+        if (count($values) !== count($headers)) {
+            fclose($stream);
+            throw new ApiError(422, "CSV row {$lineNumber}: the number of columns does not match the header.");
+        }
+        $record = [];
+        foreach (['subject code', 'section', 'room', 'day', 'time', 'program', 'instructor'] as $header) {
+            $value = isset($headerPositions[$header]) ? trim((string) $values[$headerPositions[$header]]) : '';
+            if (isset($value[1]) && $value[0] === "'" && str_contains('=+-@', $value[1])) {
+                $value = substr($value, 1);
+            }
+            $record[$header] = $value;
+        }
+        foreach ($requiredHeaders as $header) {
+            if ($record[$header] === '') {
+                fclose($stream);
+                throw new ApiError(422, "CSV row {$lineNumber}: {$header} is required.");
+            }
+        }
+        $record['row'] = $lineNumber;
+        $records[] = $record;
+        if (count($records) > 2000) {
+            fclose($stream);
+            throw new ApiError(413, 'The schedule CSV cannot contain more than 2,000 meetings.');
+        }
+    }
+    fclose($stream);
+    if ($records === []) {
+        throw new ApiError(422, 'The schedule CSV has no meeting rows.');
+    }
+
+    $termId = active_term_id($pdo);
+    $pdo->beginTransaction();
+    try {
+        $runStmt = $pdo->prepare("SELECT id, diagnostics_json FROM schedule_runs WHERE term_id = ? AND status = 'PUBLISHED' ORDER BY id DESC LIMIT 1 FOR UPDATE");
+        $runStmt->execute([$termId]);
+        $run = $runStmt->fetch();
+        if (!$run) {
+            throw new ApiError(409, 'Generate a schedule before importing meetings.');
+        }
+
+        $offeringStmt = $pdo->prepare("SELECT co.id, s.code AS subject_code, sec.code AS section_code, p.code AS program_code, i.name AS instructor_name FROM course_offerings co JOIN subjects s ON s.id = co.subject_id JOIN sections sec ON sec.id = co.section_id JOIN programs p ON p.id = sec.program_id JOIN instructors i ON i.id = co.instructor_id WHERE co.term_id = ? AND co.status = 'ACTIVE'");
+        $offeringStmt->execute([$termId]);
+        $offerings = $offeringStmt->fetchAll();
+        $rooms = $pdo->query('SELECT id, code FROM rooms WHERE active = 1')->fetchAll();
+        $meetingStmt = $pdo->prepare('SELECT COALESCE(MAX(meeting_no), 0) + 1 FROM schedule_entries WHERE run_id = ? AND offering_id = ?');
+        $insertEntry = $pdo->prepare("INSERT INTO schedule_entries (run_id, offering_id, meeting_no, room_id, day_of_week, slot_id, start_time_override, end_time_override, room_fit_override, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 'PUBLISHED')");
+        $insertOccupancy = $pdo->prepare('INSERT INTO schedule_occupancy (run_id, entry_id, resource_type, resource_id, day_of_week, slot_id) VALUES (?, ?, ?, ?, ?, ?)');
+        $imported = 0;
+
+        foreach ($records as $record) {
+            $line = (int) $record['row'];
+            $day = null;
+            foreach (DAY_NAMES as $dayNumber => $dayName) {
+                if (strcasecmp($record['day'], $dayName) === 0) {
+                    $day = (int) $dayNumber;
+                    break;
+                }
+            }
+            if ($day === null) {
+                throw new ApiError(422, "CSV row {$line}: day must be Monday, Tuesday, Wednesday, Thursday, or Friday.");
+            }
+
+            if (!preg_match('/^(\\d{1,2}:\\d{2})\\s*(AM|PM)\\s*[-–—]\\s*(\\d{1,2}:\\d{2})\\s*(AM|PM)$/i', $record['time'], $timeMatch)) {
+                throw new ApiError(422, "CSV row {$line}: time must look like 7:00 AM - 9:00 AM.");
+            }
+            $toClock = static function (string $value): string {
+                [$hour, $minute] = explode(':', $value, 2);
+                return sprintf('%02d:%02d', (int) $hour, (int) $minute);
+            };
+            try {
+                [$startTime, $endTime] = parse_manual_schedule_times([
+                    'start_time' => $toClock($timeMatch[1]),
+                    'start_period' => strtoupper($timeMatch[2]),
+                    'end_time' => $toClock($timeMatch[3]),
+                    'end_period' => strtoupper($timeMatch[4]),
+                ]);
+            } catch (ApiError $error) {
+                throw new ApiError($error->status, "CSV row {$line}: " . $error->getMessage());
+            }
+
+            $matches = array_values(array_filter($offerings, static function (array $offering) use ($record): bool {
+                return strcasecmp(trim((string) $offering['subject_code']), $record['subject code']) === 0
+                    && strcasecmp(trim((string) $offering['section_code']), $record['section']) === 0
+                    && ($record['program'] === '' || strcasecmp(trim((string) $offering['program_code']), $record['program']) === 0)
+                    && ($record['instructor'] === '' || strcasecmp(trim((string) $offering['instructor_name']), $record['instructor']) === 0);
+            }));
+            if (count($matches) !== 1) {
+                throw new ApiError(422, "CSV row {$line}: the subject, section, program, and instructor do not identify exactly one active class assignment.");
+            }
+            $offering = $matches[0];
+            $roomMatches = array_values(array_filter($rooms, static fn(array $room): bool => strcasecmp(trim((string) $room['code']), $record['room']) === 0));
+            if (count($roomMatches) !== 1) {
+                throw new ApiError(422, "CSV row {$line}: active room was not found by room code.");
+            }
+            $roomId = (int) $roomMatches[0]['id'];
+
+            try {
+                $validated = validate_manual_candidate($pdo, $termId, (int) $offering['id'], $roomId, $day, 0, null, false, [$startTime, $endTime], true);
+            } catch (ApiError $error) {
+                throw new ApiError($error->status, "CSV row {$line}: " . $error->getMessage());
+            }
+            $meetingStmt->execute([(int) $run['id'], (int) $offering['id']]);
+            $meetingNumber = (int) $meetingStmt->fetchColumn();
+            $slotId = (int) $validated['candidate']['slot_id'];
+            $insertEntry->execute([(int) $run['id'], (int) $offering['id'], $meetingNumber, $roomId, $day, $slotId, $startTime, $endTime]);
+            $entryId = db_insert_id($pdo, 'schedule_entries');
+            foreach ($validated['candidate']['slot_ids'] as $occupiedSlot) {
+                foreach ([['ROOM', $roomId], ['INSTRUCTOR', (int) $validated['offering']['instructor_id']], ['SECTION', (int) $validated['offering']['section_id']]] as [$type, $resourceId]) {
+                    $insertOccupancy->execute([(int) $run['id'], $entryId, $type, $resourceId, $day, (int) $occupiedSlot]);
+                }
+            }
+            $imported++;
+        }
+
+        $assignedStmt = $pdo->prepare("SELECT COUNT(*) FROM schedule_entries WHERE run_id = ? AND status = 'PUBLISHED'");
+        $assignedStmt->execute([(int) $run['id']]);
+        $assigned = (int) $assignedStmt->fetchColumn();
+        $totalTasks = schedule_run_task_total($pdo, (int) $run['id'], $termId);
+        $diagnostics = json_decode((string) $run['diagnostics_json'], true);
+        $diagnostics = is_array($diagnostics) ? $diagnostics : [];
+        $diagnostics['assigned_tasks'] = $assigned;
+        $diagnostics['total_tasks'] = $totalTasks;
+        $pdo->prepare('UPDATE schedule_runs SET total_tasks = ?, assigned_tasks = ?, diagnostics_json = ? WHERE id = ?')
+            ->execute([$totalTasks, $assigned, encode_json($diagnostics), (int) $run['id']]);
+        audit($pdo, $user, 'IMPORT_SCHEDULE', 'schedule_run', (int) $run['id'], ['imported_entries' => $imported]);
+        $pdo->commit();
+    } catch (Throwable $error) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        if ($error instanceof ApiError) throw $error;
+        error_log('EasySched schedule CSV import error: ' . $error->getMessage());
+        throw new ApiError(409, 'The schedule CSV could not be imported. No meetings were added. Refresh and try again.');
+    }
+
+    return ['imported_entries' => $imported, 'snapshot' => bootstrap($pdo, $user)];
+}
+
 function handle(PDO $pdo): never
 {
     $action = (string) ($_GET['action'] ?? $_POST['action'] ?? 'bootstrap');
@@ -3540,11 +3715,17 @@ function handle(PDO $pdo): never
     }
 
     $user = require_auth($pdo);
-    if (in_array($action, ['generate','generate_selected','save_schedule','add_schedule','delete_schedule','save_master','import_offerings','change_password','save_settings','save_student_profile','review_registration','request_schedule','request_schedule_change','review_schedule_request','check_room_availability','available_rooms','request_email_change_otp','confirm_email_change'], true)) require_csrf($input);
+    if (in_array($action, ['generate','generate_selected','save_schedule','add_schedule','delete_schedule','clear_schedule','import_schedule','save_master','import_offerings','change_password','save_settings','save_student_profile','review_registration','request_schedule','request_schedule_change','review_schedule_request','check_room_availability','available_rooms','request_email_change_otp','confirm_email_change'], true)) require_csrf($input);
     if ($action === 'import_offerings') {
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') throw new ApiError(405, 'POST is required.');
         $admin = require_auth($pdo, ['admin']);
         respond(['ok' => true, 'data' => import_offerings_csv($pdo, $admin, $input)]);
+    }
+    if ($action === 'import_schedule') {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') throw new ApiError(405, 'POST is required.');
+        $manager = require_auth($pdo, ['admin', 'scheduler']);
+        $result = import_schedule_csv($pdo, $manager, $input);
+        respond(['ok' => true, 'data' => $result]);
     }
     if ($action === 'request_email_change_otp') {
         respond(['ok' => true, 'data' => request_email_change_otp($pdo, $user, $input)]);
@@ -3741,6 +3922,51 @@ function handle(PDO $pdo): never
             throw new ApiError(409, 'The class could not be cancelled. Refresh and try again.');
         }
         respond(['ok' => true, 'data' => ['snapshot' => bootstrap($pdo, $user)]]);
+    }
+    if ($action === 'clear_schedule') {
+        $admin = require_auth($pdo, ['admin']);
+        $password = $input['password'] ?? null;
+        if (!is_string($password) || $password === '' || strlen($password) > 200) {
+            throw new ApiError(422, 'Enter your administrator password to clear the schedule.');
+        }
+        $passwordStmt = $pdo->prepare('SELECT password_hash FROM users WHERE id = ? AND role = \'admin\' AND active = 1');
+        $passwordStmt->execute([(int) $admin['id']]);
+        $passwordHash = $passwordStmt->fetchColumn();
+        if (!is_string($passwordHash) || !password_verify($password, $passwordHash)) {
+            throw new ApiError(403, 'The administrator password is incorrect.');
+        }
+        $termId = active_term_id($pdo);
+        $pdo->beginTransaction();
+        try {
+            $runStmt = $pdo->prepare("SELECT id, diagnostics_json FROM schedule_runs WHERE term_id = ? AND status = 'PUBLISHED' ORDER BY id DESC LIMIT 1 FOR UPDATE");
+            $runStmt->execute([$termId]);
+            $run = $runStmt->fetch();
+            if (!$run) throw new ApiError(409, 'There is no published schedule to clear.');
+
+            $countStmt = $pdo->prepare("SELECT COUNT(*) FROM schedule_entries WHERE run_id = ? AND status = 'PUBLISHED'");
+            $countStmt->execute([(int) $run['id']]);
+            $cancelledEntries = (int) $countStmt->fetchColumn();
+            if ($cancelledEntries === 0) throw new ApiError(409, 'The published schedule has no active classes to clear.');
+
+            $pdo->prepare("UPDATE schedule_entries SET status = 'CANCELLED' WHERE run_id = ? AND status = 'PUBLISHED'")
+                ->execute([(int) $run['id']]);
+            $pdo->prepare('DELETE FROM schedule_occupancy WHERE run_id = ?')->execute([(int) $run['id']]);
+            $totalTasks = schedule_run_task_total($pdo, (int) $run['id'], $termId);
+            $diagnostics = json_decode((string) $run['diagnostics_json'], true);
+            $diagnostics = is_array($diagnostics) ? $diagnostics : [];
+            $diagnostics['assigned_tasks'] = 0;
+            $diagnostics['total_tasks'] = $totalTasks;
+            $pdo->prepare('UPDATE schedule_runs SET total_tasks = ?, assigned_tasks = 0, diagnostics_json = ? WHERE id = ?')
+                ->execute([$totalTasks, encode_json($diagnostics), (int) $run['id']]);
+            audit($pdo, $user, 'CLEAR_SCHEDULE', 'schedule_run', (int) $run['id'], ['cancelled_entries' => $cancelledEntries]);
+            $pdo->commit();
+        } catch (Throwable $error) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            if ($error instanceof ApiError) throw $error;
+            error_log('EasySched schedule clear error: ' . $error->getMessage());
+            throw new ApiError(409, 'The published schedule could not be cleared. Refresh and try again.');
+        }
+        respond(['ok' => true, 'data' => ['cancelled_entries' => $cancelledEntries, 'snapshot' => bootstrap($pdo, $user)]]);
     }
     if ($action === 'change_password') { $current=(string)($input['current_password']??'');$next=(string)($input['new_password']??'');$confirm=(string)($input['confirm_password']??'');if($current===''||$next!==$confirm||!password_meets_requirements($next))throw new ApiError(422,'Use a matching password with at least 10 characters, one uppercase letter, one number, and one special character.');$stmt=$pdo->prepare('SELECT password_hash FROM users WHERE id=?');$stmt->execute([(int)$user['id']]);if(!password_verify($current,(string)$stmt->fetchColumn()))throw new ApiError(401,'The current password is incorrect.');$pdo->prepare('UPDATE users SET password_hash=? WHERE id=?')->execute([password_hash($next,PASSWORD_DEFAULT),(int)$user['id']]);audit($pdo,$user,'CHANGE_PASSWORD','user',(int)$user['id']);respond(['ok'=>true,'data'=>['message'=>'Password changed successfully.']]); }
     if ($action === 'save_settings') { require_auth($pdo,['admin']);$year=input_string($input,'academic_year',9);$semester=input_string($input,'semester',30);if(!preg_match('/^20\d{2}-20\d{2}$/',$year)||!in_array($semester,['First Semester','Second Semester','Summer'],true))throw new ApiError(422,'Academic year or semester is invalid.');$stmt=$pdo->prepare('SELECT id FROM academic_terms WHERE academic_year=? AND semester=?');$stmt->execute([$year,$semester]);$termId=(int)($stmt->fetchColumn()?:0);if(!$termId){$pdo->prepare('INSERT INTO academic_terms (academic_year,semester,is_active) VALUES (?,?,1)')->execute([$year,$semester]);$termId=db_insert_id($pdo, 'academic_terms');}$pdo->prepare("UPDATE academic_terms SET is_active=0")->execute();$pdo->prepare('UPDATE academic_terms SET is_active=1 WHERE id=?')->execute([$termId]);$pdo->prepare("INSERT INTO system_settings(setting_key,setting_value) VALUES('active_term_id',?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value")->execute([(string)$termId]);audit($pdo,$user,'UPDATE_SETTINGS');respond(['ok'=>true,'data'=>['snapshot'=>bootstrap($pdo,$user)]]); }

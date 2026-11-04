@@ -674,6 +674,8 @@
 
   function navigate(page, updateRoute = true) {
     if (!navPageIds().includes(page)) return;
+    const helpVideo = $('#helpTutorialPanel video');
+    if (page !== 'help' && helpVideo) helpVideo.pause();
     if (updateRoute) setRoute(page);
     if (state.page !== page) {
       state.query = '';
@@ -733,6 +735,18 @@
     $('#helpBackButton').disabled = helpIndex === 0;
     $('#helpNextButton').textContent = helpIndex === slides.length - 1 ? 'Finish' : 'Next';
     $('#helpDots').innerHTML = slides.map((_, i) => `<button type="button" class="help-dot${i === helpIndex ? ' active' : ''}" data-help-index="${i}" aria-label="Step ${i + 1}" aria-current="${i === helpIndex ? 'step' : 'false'}"></button>`).join('');
+    const tutorials = {
+      instructor: { title: 'Faculty Schedule & Room Requests Walkthrough', description: 'Learn how to view your assigned schedule and submit room or schedule change requests.', source: 'assets/professor-tutorial.mp4', label: 'Professor video tutorial' },
+      student: { title: 'Student Timetable Viewer Guide', description: 'Learn how to view your section’s published classes, rooms, instructors, and times.', source: 'assets/student-tutorial.mp4', label: 'Student video tutorial' }
+    };
+    const tutorial = tutorials[role()];
+    const showTutorial = Boolean(tutorial) && helpIndex === 0;
+    const tutorialPanel = $('#helpTutorialPanel');
+    $('#helpHero').classList.toggle('has-video', showTutorial);
+    tutorialPanel.hidden = !showTutorial;
+    tutorialPanel.innerHTML = showTutorial
+      ? `<p class="eyebrow">Video tutorial</p><h3 id="helpTutorialTitle">${esc(tutorial.title)}</h3><p class="muted">${esc(tutorial.description)}</p><video class="help-tutorial-video" controls preload="metadata" playsinline aria-label="${esc(tutorial.label)}"><source src="${tutorial.source}" type="video/mp4">Your browser does not support HTML video.</video>`
+      : '';
   }
 
   function applySnapshot(snapshot) {
@@ -951,6 +965,8 @@
     const termLabel = selectedTerm ? `${selectedTerm.academic_year} · ${selectedTerm.semester}` : 'No academic term';
     const isActiveTerm = Number(selectedScheduleTermId) === activeTermId;
     const canEditSelectedSchedule = canManage() && isActiveTerm && !selectedScheduleRun;
+    $('#clearScheduleButton').hidden = !canAdmin() || !isActiveTerm || Boolean(selectedScheduleRun) || Number(state.snapshot.active_run?.assigned_tasks || 0) === 0;
+    $('#importScheduleButton').hidden = !canEditSelectedSchedule || !state.snapshot.active_run;
     $('#addScheduleButton').hidden = !canEditSelectedSchedule;
     $('#manualGenerateButton').hidden = !canEditSelectedSchedule;
     $('#generateButton').hidden = !canEditSelectedSchedule;
@@ -978,10 +994,6 @@
       ? ['No classes match this view', 'Change the filter above, or generate a schedule.']
       : ['No published classes for this term', 'This inactive academic term does not have a published schedule yet.'];
     $('#scheduleTableBody').innerHTML = rows.length ? rows.map((row) => scheduleRow(row, true, canEditSelectedSchedule)).join('') : `<tr class="${emptyStateClass}"><td colspan="${columnCount}">${emptyState(emptyScheduleMessage[0], emptyScheduleMessage[1])}</td></tr>`;
-    const hasRun = selectedScheduleRun ? Boolean(selectedScheduleHasRun) : isActiveTerm ? Boolean(state.snapshot.active_run) : Boolean(selectedScheduleHasRun);
-    const valid = isActiveTerm && !selectedScheduleRun ? Boolean(state.snapshot.validation?.valid) : Boolean(selectedScheduleValidation?.valid);
-    $('#conflictBadge').textContent = selectedScheduleIsSample ? 'Sample only' : selectedScheduleRun?.status === 'ARCHIVED' ? 'Archived version' : hasRun ? (valid ? 'Validated' : 'Conflict found') : 'No published schedule';
-    $('#conflictBadge').className = `badge ${selectedScheduleIsSample ? 'badge-warning' : selectedScheduleRun?.status === 'ARCHIVED' || !hasRun ? 'badge-neutral' : (valid ? 'badge-neutral' : 'badge-warning')}`;
     renderCalendar(rows);
     updatePrintMeta(rows.length);
     $$('.manage-column').forEach((cell) => { cell.hidden = !canManage(); });
@@ -2034,6 +2046,56 @@
 
   async function cancelScheduleEntry(entryId) { if (!canManage() || !window.confirm('Cancel this class meeting? The published run will be marked incomplete until regenerated.')) return; try { const result = await request('delete_schedule', { method: 'POST', body: { entry_id: Number(entryId) } }); applySnapshot(result.snapshot); showToast('Class cancelled', 'The meeting was removed while the schedule history was preserved.', 'warn'); } catch (error) { showToast('Cannot cancel class', error.message, 'error'); } }
 
+  function openClearScheduleDialog() {
+    if (!canAdmin()) return;
+    $('#clearScheduleStatus').textContent = '';
+    $('#clearScheduleDialog').showModal();
+    $('#clearSchedulePassword').focus();
+  }
+
+  async function clearActiveSchedule(event) {
+    event.preventDefault();
+    if (!canAdmin()) return;
+    const submit = $('#confirmClearScheduleButton');
+    const status = $('#clearScheduleStatus');
+    submit.disabled = true;
+    status.textContent = 'Verifying administrator password...';
+    try {
+      const result = await request('clear_schedule', { method: 'POST', body: { password: $('#clearSchedulePassword').value } });
+      $('#clearScheduleDialog').close();
+      applySnapshot(result.snapshot);
+      const count = Number(result.cancelled_entries || 0);
+      showToast('Schedule cleared', `${count} ${count === 1 ? 'class was' : 'classes were'} cancelled. You can now generate a new schedule.`, 'warn');
+    } catch (error) {
+      status.textContent = error.message;
+      $('#clearSchedulePassword').focus();
+    } finally {
+      submit.disabled = false;
+    }
+  }
+
+  async function importScheduleCsv(event) {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    if (!file) return;
+    const button = $('#importScheduleButton');
+    try {
+      if (file.size > 2000000) throw new Error('Choose a CSV file that is 2 MB or smaller.');
+      const confirmed = window.confirm(`Merge meetings from "${file.name}" into the active schedule? Existing classes stay in place. If any row is invalid or conflicts, the entire import will be rejected.`);
+      if (!confirmed) return;
+      button.disabled = true;
+      const result = await request('import_schedule', { method: 'POST', body: { csv: await file.text() } });
+      applySnapshot(result.snapshot);
+      const count = Number(result.imported_entries || 0);
+      showToast('Schedule imported', `${count} ${count === 1 ? 'meeting was' : 'meetings were'} added to the active schedule.`);
+    } catch (error) {
+      showToast('Could not import schedule', error.message, 'error');
+    } finally {
+      input.value = '';
+      button.disabled = false;
+    }
+  }
+
   function manualGenerationFields() {
     const snapshot = state.snapshot;
     const offerings = snapshot.offerings || [];
@@ -2397,6 +2459,8 @@
     });
     $('#subjectSearch').addEventListener('input', (event) => { state.subjectQuery = event.target.value; if (state.page === 'data' && state.dataTab === 'subjects') renderData(); });
     $('#offeringImportForm').addEventListener('submit', importOfferings);
+    $('#importScheduleButton').addEventListener('click', () => $('#scheduleImportFile').click());
+    $('#scheduleImportFile').addEventListener('change', importScheduleCsv);
     $('#offeringImportTemplate').addEventListener('click', downloadOfferingsTemplate);
     $('#offeringExportButton').addEventListener('click', exportOfferings);
     $('#helpBackButton').addEventListener('click', () => { if (helpIndex > 0) { helpIndex -= 1; renderHelp(); } }); $('#helpNextButton').addEventListener('click', () => { const slides = HELP_SLIDES[role()] || helpSlides; if (helpIndex < slides.length - 1) { helpIndex += 1; renderHelp(); } else navigate('dashboard'); });
@@ -2439,6 +2503,13 @@
     $('#requestRoom').addEventListener('change', () => { $('#submitRoomRequestButton').disabled = !availableRoomsReady || !roomRequestAllowed || !$('#requestRoom').value; });
     $('#scheduleRequestForm').addEventListener('submit', requestSchedule); ['#requestStartTime', '#requestEndTime'].forEach((selector) => $(selector).addEventListener('input', (event) => formatTimeInput(event.target)));             document.addEventListener('click', (event) => { const dashboardManualGenerate = event.target.closest('[data-dashboard-manual-generate]'); if (dashboardManualGenerate) { openManualGenerationModal(); return; } const dashboardGenerate = event.target.closest('[data-dashboard-generate]'); if (dashboardGenerate) { generate(); return; } const dashboardAdd = event.target.closest('[data-dashboard-add]'); if (dashboardAdd) { navigate('schedules'); openAddScheduleModal(); return; } const navigateButton = event.target.closest('[data-navigate]'); if (navigateButton) { if (!navigateButton.dataset.navigate) return; if (navigateButton.dataset.dashboardTab) state.dataTab = navigateButton.dataset.dashboardTab; navigate(navigateButton.dataset.navigate); } const dataTab = event.target.closest('[data-data-tab]'); if (dataTab) { state.dataTab = dataTab.dataset.dataTab; $$('.tab-button').forEach((button) => { const active = button.dataset.dataTab === state.dataTab; button.classList.toggle('active', active); button.setAttribute('aria-selected', String(active)); }); renderData(); } const review = event.target.closest('.review-registration'); if (review) reviewRegistration(Number(review.dataset.registrationId), review.dataset.decision); const scheduleReview = event.target.closest('.review-schedule-request'); if (scheduleReview) reviewScheduleRequest(Number(scheduleReview.dataset.requestId), scheduleReview.dataset.decision); const edit = event.target.closest('.edit-record'); if (edit) openDataRecord(edit.dataset.entity, Number(edit.dataset.recordId)); const del = event.target.closest('.delete-record'); if (del) deleteRecord(del.dataset.entity, Number(del.dataset.recordId)); const editEntry = event.target.closest('.edit-entry'); if (editEntry) openScheduleEditor(Number(editEntry.dataset.entryId)); const cancelEntry = event.target.closest('.cancel-entry'); if (cancelEntry) cancelScheduleEntry(Number(cancelEntry.dataset.entryId)); });
     $('#scheduleChangeForm').addEventListener('submit', requestScheduleChange);
+    $('#clearScheduleButton').addEventListener('click', openClearScheduleDialog);
+    $('#clearScheduleForm').addEventListener('submit', clearActiveSchedule);
+    $('#cancelClearScheduleButton').addEventListener('click', () => $('#clearScheduleDialog').close());
+    $('#clearScheduleDialog').addEventListener('close', () => {
+      $('#clearScheduleForm').reset();
+      $('#clearScheduleStatus').textContent = '';
+    });
     $('#changeEntry').addEventListener('change', setChangeFormFromSelectedEntry);
     ['#changeStartTime', '#changeEndTime'].forEach((selector) => $(selector).addEventListener('input', (event) => formatTimeInput(event.target)));
     document.addEventListener('input', (event) => {

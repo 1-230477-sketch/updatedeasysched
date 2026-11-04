@@ -510,6 +510,8 @@ const EASYSCHED_SCHOOL = 'New Sinai School and Colleges Sta. Rosa, Inc.';
                             <button class="button button-ghost" id="printButton" type="button"><?= easysched_icon('printer', '15') ?>Print</button>
                             <button class="button button-ghost student-only" id="studentLinksButton" type="button" aria-haspopup="dialog" aria-controls="studentLinksDialog" hidden>Links</button>
                             <button class="button button-secondary" id="exportButton" type="button"><?= easysched_icon('download', '15') ?>Export CSV</button>
+                            <input id="scheduleImportFile" type="file" accept=".csv,text/csv" hidden>
+                            <button class="button button-secondary manage-only" id="importScheduleButton" type="button" hidden>Import schedule CSV</button>
                             <button class="button button-secondary manage-only" id="addScheduleButton" type="button">Add class</button>
                             <button class="button button-secondary manage-only" id="manualGenerateButton" type="button"><?= easysched_icon('list', '15') ?>Manual generate</button>
                             <button class="button button-primary manage-only" id="generateButton" type="button"><?= easysched_icon('sparkle', '15') ?>Auto generate</button>
@@ -542,7 +544,7 @@ const EASYSCHED_SCHOOL = 'New Sinai School and Colleges Sta. Rosa, Inc.';
                     </div>
                     <div class="calendar-panel"><div class="calendar-grid" id="calendarGrid"></div></div>
                     <article class="panel schedule-table-panel">
-                        <div class="panel-heading"><div><p class="eyebrow">Detailed list</p><h3 id="scheduleCountLabel">0 classes</h3></div><span class="badge badge-neutral" id="conflictBadge">Validated</span></div>
+                        <div class="panel-heading"><div><p class="eyebrow">Detailed list</p><h3 id="scheduleCountLabel">0 classes</h3></div><div class="schedule-list-actions"><button class="button button-danger button-small" id="clearScheduleButton" type="button" hidden>Clear schedule</button></div></div>
                         <div class="table-wrap">
                             <table class="data-table">
                                 <thead><tr><th>Day</th><th>Time</th><th>Subject</th><th>Section</th><th>Instructor</th><th>Room</th><th class="manage-column">Action</th></tr></thead>
@@ -724,9 +726,10 @@ const EASYSCHED_SCHOOL = 'New Sinai School and Colleges Sta. Rosa, Inc.';
 
                 <section class="page help-page" id="page-help" data-page="help" aria-labelledby="helpHeading" hidden>
                     <div class="page-heading"><div><p class="eyebrow"></p><h2 id="helpHeading">Help center</h2><p class="muted">A short walkthrough for managing EasySched from setup to a published timetable.</p></div></div>
-                    <article class="panel help-hero">
+                    <article class="panel help-hero" id="helpHero">
                         <div class="help-slide-count" id="helpSlideCount">1 / 8</div>
                         <div id="helpSlideContent"></div>
+                        <div class="help-tutorial-inline" id="helpTutorialPanel" aria-labelledby="helpTutorialTitle" hidden></div>
                     </article>
                     <div class="help-controls"><button class="button button-ghost" id="helpBackButton" type="button">Back</button><div class="help-dots" id="helpDots" aria-label="Help steps"></div><button class="button button-primary" id="helpNextButton" type="button">Next</button></div>
                 </section>
@@ -756,6 +759,16 @@ const EASYSCHED_SCHOOL = 'New Sinai School and Colleges Sta. Rosa, Inc.';
             <img class="brand-popup-image" src="assets/easysched-splash.webp" alt="Powered by EasySched. Automated Scheduling System. More About Us. App Version 1.0. Copyright 2026 Easy Sched.">
         </section>
     </div>
+
+    <dialog class="audit-detail-dialog" id="clearScheduleDialog" aria-labelledby="clearScheduleTitle">
+        <form id="clearScheduleForm">
+            <div class="panel-heading"><div><p class="eyebrow">Security confirmation</p><h3 id="clearScheduleTitle">Clear active schedule</h3></div></div>
+            <p class="muted">This will cancel all classes in the active schedule. Schedule history will be preserved. Enter your administrator password to continue.</p>
+            <div class="field"><label for="clearSchedulePassword">Administrator password</label><input id="clearSchedulePassword" type="password" autocomplete="current-password" maxlength="200" required></div>
+            <p class="field-hint" id="clearScheduleStatus" role="status" aria-live="polite"></p>
+            <div class="row-actions"><button class="button button-ghost" id="cancelClearScheduleButton" type="button">Cancel</button><button class="button button-danger" id="confirmClearScheduleButton" type="submit">Clear schedule</button></div>
+        </form>
+    </dialog>
 
     <div class="tutorial-video-modal" id="tutorialVideoModal" hidden>
         <section class="tutorial-video-modal-card" role="dialog" aria-modal="true" aria-labelledby="tutorialVideoModalTitle">
