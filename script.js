@@ -1871,12 +1871,15 @@
       showToast('No class assignments', 'Add a class assignment in Academic setup before scheduling a meeting.', 'warn');
       return;
     }
-    const offeringOptions = offerings.map((item) => {
+    const offeringOptions = (instructorId) => offerings.filter((item) => Number(item.instructor_id) === Number(instructorId)).map((item) => {
       const scheduled = scheduledCounts.get(Number(item.id)) || 0;
       const remaining = Number(item.required_meetings) - scheduled;
       const meetingStatus = remaining > 0 ? `${remaining} required remaining` : `extra meeting (${scheduled} already scheduled)`;
       return [item.id, `${item.subject_code} · ${item.section_code} (${meetingStatus})`];
     });
+    const facultyOptions = [...new Map(offerings.map((item) => [Number(item.instructor_id), [Number(item.instructor_id), item.instructor_name]])).values()];
+    const initialFacultyId = facultyOptions[0]?.[0];
+    const initialOfferingOptions = offeringOptions(initialFacultyId);
     const roomOptions = state.snapshot.rooms.map((item) => [item.id, `${item.code} · ${item.name}`]);
     const dayOptions = days();
     const availableSlots = slots().filter((item) => Number(item.slot_order) !== 6);
@@ -1886,14 +1889,24 @@
     }
     const timeField = (name, label, value, period) => `<div class="field"><label for="modal-${name}">${label}</label><div class="time-input-group"><input id="modal-${name}" name="${name}" value="${value}" inputmode="numeric" maxlength="5" pattern="[0-9]{2}:[0-9]{2}" placeholder="HH:MM" required><select id="modal-${period}" name="${period}" aria-label="${label} period"><option selected>AM</option><option>PM</option></select></div></div>`;
     openModal('Add class', () => [
-      selectField('offering_id', 'Course and section', offeringOptions[0][0], offeringOptions),
+      selectField('offering_id', 'Course and section', initialOfferingOptions[0][0], initialOfferingOptions),
       selectField('room_id', 'Room', roomOptions[0]?.[0] || '', roomOptions),
       selectField('day_of_week', 'Day', dayOptions[0]?.[0] || '', dayOptions),
+      selectField('instructor_id', 'Faculty', initialFacultyId, facultyOptions),
       timeField('start_time', 'Start time', '07:00', 'start_period'),
       timeField('end_time', 'End time', '09:00', 'end_period'),
       '<p class="field-hint full">Enter any class duration that fits configured timetable hours. Manual additions can use a room that does not meet the class capacity, type, or feature requirements. Availability, schedule conflicts, lunch breaks, and instructor daily-hour limits are still checked.</p>',
       '<p class="field-hint full">Adds one meeting, including extra meetings when all required meetings are scheduled.</p>'
     ], 'add-schedule');
+    $('#modal-instructor_id').addEventListener('change', (event) => {
+      const options = offeringOptions(event.currentTarget.value);
+      $('#modal-offering_id').replaceChildren(...options.map(([value, label]) => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = label;
+        return option;
+      }));
+    });
   }
 
   async function submitScheduleEditor(event) {
