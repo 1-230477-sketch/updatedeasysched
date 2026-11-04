@@ -530,7 +530,7 @@ const EASYSCHED_SCHOOL = 'New Sinai School and Colleges Sta. Rosa, Inc.';
                         </div>
                     </dialog>
                     <div class="filter-bar">
-                        <label class="field-inline">View<select id="scheduleViewFilter"><option value="all">All classes</option><option value="section">By section</option><option value="instructor">By instructor</option><option value="room">By room</option><option value="room_type">By room type</option></select></label>
+                        <label class="field-inline">View<select id="scheduleViewFilter"><option value="all">All classes</option><option value="section">By section</option><option value="student">By student</option><option value="instructor">By instructor</option><option value="room">By room</option><option value="room_type">By room type</option></select></label>
                         <label class="field-inline" id="scheduleFilterValueWrap">Filter<select id="scheduleFilterValue"><option value="all">All</option></select></label>
                         <div class="calendar-view-control" role="group" aria-label="Timetable layout">
                             <button class="calendar-view-button is-active" id="calendarWeekView" type="button" aria-pressed="true">Week</button>

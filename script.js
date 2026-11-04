@@ -122,7 +122,7 @@
       ['Scheduler orientation', 'You prepare academic records, generate schedules, and maintain the published timetable without managing user accounts.', ['Begin by checking the active term and master data.']],
       ['Prepare scheduling inputs', 'Review programs, subjects, faculty, rooms, sections, and Class assignments before generating. Each program has Years 1 through 4 with Sections A and B.', ['Incomplete or conflicting inputs can make generation impossible.']],
       ['Generate a schedule', 'Auto generate builds the full timetable. Manual generate lets you filter by program, section, subject, and instructor; matching offerings are replaced while the rest are preserved.', ['Both options validate room, time, availability, section, and instructor constraints before publication.']],
-      ['Review and edit safely', 'Use the weekly schedule filters to inspect by section, instructor, or room. Add a missing required meeting or edit an existing entry; both actions are checked against the same hard constraints.', ['Regenerate when the academic inputs have materially changed.']],
+      ['Review and edit safely', 'Use the weekly schedule filters to inspect by section, student, instructor, or room. Add a missing required meeting or edit an existing entry; both actions are checked against the same hard constraints.', ['Regenerate when the academic inputs have materially changed.']],
       ['Reports and handoff', 'Use Reports and CSV/print export to document room utilization, validation results, and the final timetable.', ['Keep the published run as the approved reference.']]
     ],
     instructor: [
@@ -146,7 +146,7 @@
     ['Prepare the academic setup', 'Maintain the active term, four programs, 16 subjects, faculty, seven room types, sections, and Class assignments before generating.', ['Each program uses Years 1 through 4 with two sections per year.']],
     ['Create Class assignments', 'Connect a subject to a section, instructor, academic term, enrollment count, and meetings per week. These are the actual classes the scheduler places.', ['Subjects define the curriculum; Class assignments define what runs this term.']],
     ['Generate a schedule', 'Use Auto generate for the full timetable or Manual generate to select programs, sections, subjects, and instructors. Manual generation replaces matching offerings and preserves all others.', ['A failed generation never replaces the last published schedule.']],
-    ['Review the weekly timetable', 'Use the view and filter controls to inspect schedules by section, instructor, or room. Calendar blocks show their exact start and end times and span the full class duration.', ['Conflicts are rejected before publication.']],
+    ['Review the weekly timetable', 'Use the view and filter controls to inspect schedules by section, student, instructor, or room. Calendar blocks show their exact start and end times and span the full class duration.', ['Conflicts are rejected before publication.']],
     ['Publish and manage changes', 'Add missing required meetings or edit existing entries; manual placements are validated against the same conflict rules before saving.', ['Keep the published run stable while testing alternatives.']],
     ['Reports and exports', 'Reports show constraint checks and room utilization. Export the visible schedule as CSV or print a clean timetable for review.', ['Apply filters before exporting when you need a focused report.']],
     ['Account security and support', 'Change your password in Settings. Use HTTPS in deployment, keep database secrets server-side, and contact an administrator when access or data needs review.', ['Return to this Help center any time from the sidebar.']]
@@ -843,8 +843,11 @@
 
   function visibleScheduleRows() {
     const query = state.query.toLowerCase();
+    const selectedStudent = state.scheduleView === 'student'
+      ? (state.snapshot.users || []).find((user) => String(user.id) === state.scheduleFilter)
+      : null;
     return scheduleViewRows().filter((row) => {
-      const selected = state.scheduleView === 'all' || state.scheduleFilter === 'all' || (state.scheduleView === 'section' && String(row.section_id) === state.scheduleFilter) || (state.scheduleView === 'instructor' && String(row.instructor_id) === state.scheduleFilter) || (state.scheduleView === 'room' && String(row.room_id) === state.scheduleFilter) || (state.scheduleView === 'room_type' && scheduleTypeClass(row.room_type) === state.scheduleFilter);
+      const selected = state.scheduleView === 'all' || state.scheduleFilter === 'all' || (state.scheduleView === 'section' && String(row.section_id) === state.scheduleFilter) || (state.scheduleView === 'student' && selectedStudent && String(row.section_id) === String(selectedStudent.section_id)) || (state.scheduleView === 'instructor' && String(row.instructor_id) === state.scheduleFilter) || (state.scheduleView === 'room' && String(row.room_id) === state.scheduleFilter) || (state.scheduleView === 'room_type' && scheduleTypeClass(row.room_type) === state.scheduleFilter);
       const searchable = `${row.subject_code} ${row.subject_name} ${row.section_code} ${row.instructor_name} ${row.room_code} ${row.room_type} ${row.day_name} ${row.slot_label}`.toLowerCase();
       return selected && (!query || searchable.includes(query));
     });
@@ -1133,7 +1136,15 @@
     const select = $('#scheduleFilterValue'); const previous = state.scheduleFilter; let values = [];
     const rows = scheduleViewRows();
     const unique = (key, label) => [...new Map(rows.map((row) => [String(row[key]), [row[key], label(row)]])).values()];
+    const students = (state.snapshot.users || []).filter((user) => user.role === 'student' && user.section_id && rows.some((row) => String(row.section_id) === String(user.section_id)));
+    const studentViewOption = $('#scheduleViewFilter option[value="student"]');
+    studentViewOption.hidden = students.length === 0;
+    if (state.scheduleView === 'student' && students.length === 0) {
+      state.scheduleView = 'all';
+      $('#scheduleViewFilter').value = 'all';
+    }
     if (state.scheduleView === 'section') values = unique('section_id', (item) => `${item.section_code} - ${item.program_code}`);
+    if (state.scheduleView === 'student') values = students.map((student) => [student.id, `${student.display_name} · ${student.section_code || 'Unassigned section'}`]);
     if (state.scheduleView === 'instructor') values = unique('instructor_id', (item) => item.instructor_name);
     if (state.scheduleView === 'room') values = unique('room_id', (item) => item.room_code);
     if (state.scheduleView === 'room_type') values = [['lecture', 'Lecture'], ['lab', 'Laboratory'], ['other', 'Special']];
