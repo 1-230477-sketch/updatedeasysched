@@ -806,13 +806,13 @@
     const nextClass = remainingClasses[0];
     const metrics = canSeeGeneration()
       ? [metric('Active class assignments', snapshot.offerings.length, 'Course-section assignments'), metric('Published classes', list.length, run ? `Run #${run.id}` : 'No published run'), metric('Sections', snapshot.sections.length, 'Current academic term'), metric('Rooms', snapshot.rooms.length, 'Available resources')]
-      : [metric('My classes', list.length, role() === 'student' ? 'Classes in your section' : 'Classes assigned to you'), metric("Today's classes", todayCount, 'Scheduled for today'), metric('Rooms', new Set(list.map((row) => row.room_id)).size, 'Rooms in your schedule'), metric('Next class', nextClass?.time_label || 'None', nextClass ? `${nextClass.subject_code} · ${nextClass.room_code}` : 'No upcoming class')];
+      : [metric('My classes', list.length, role() === 'student' ? 'Classes in your section' : 'Classes assigned to you'), metric("Today's classes", todayCount, 'Scheduled for today'), metric('Rooms', new Set(list.map((row) => row.room_id)).size, 'Rooms in your schedule'), metric('Next class', nextClass?.time_label || 'None', nextClass ? `${nextClass.subject_code} · ${nextClass.room_code} · ${roomBuildingLabel(nextClass)}` : 'No upcoming class')];
     $('#metricGrid').innerHTML = metrics.join('');
     const query = state.query.trim().toLowerCase();
-    const upcoming = remainingClasses.filter((row) => !query || `${row.subject_code} ${row.subject_name} ${row.section_code} ${row.program_code} ${row.room_code} ${row.instructor_name}`.toLowerCase().includes(query)).slice(0, 6);
+    const upcoming = remainingClasses.filter((row) => !query || `${row.subject_code} ${row.subject_name} ${row.section_code} ${row.program_code} ${row.room_code} ${roomBuildingLabel(row)} ${row.instructor_name}`.toLowerCase().includes(query)).slice(0, 6);
     const emptyTitle = query ? 'No matching classes' : list.length ? 'No upcoming classes' : 'No published schedule';
     const emptyMessage = query ? 'Try another subject, section, room, or instructor.' : list.length ? 'There are no remaining classes for the rest of this week.' : 'Generate a conflict-free timetable to populate this list.';
-    $('#upcomingBody').innerHTML = upcoming.length ? upcoming.map((row) => `<tr><td><strong>${esc(row.day_name)}</strong><span class="subline">${esc(row.time_label || row.slot_label)}</span></td><td><strong>${esc(row.subject_code)}</strong><span class="subline">${esc(row.subject_name)}</span></td><td>${esc(row.section_code)}</td><td>${esc(row.room_code)}</td><td>${esc(row.instructor_name)}</td></tr>`).join('') : `<tr><td colspan="5">${emptyState(emptyTitle, emptyMessage)}</td></tr>`;
+    $('#upcomingBody').innerHTML = upcoming.length ? upcoming.map((row) => `<tr><td><strong>${esc(row.day_name)}</strong><span class="subline">${esc(row.time_label || row.slot_label)}</span></td><td><strong>${esc(row.subject_code)}</strong><span class="subline">${esc(row.subject_name)}</span></td><td>${esc(row.section_code)}</td><td><strong>${esc(row.room_code)}</strong><span class="subline">${esc(roomBuildingLabel(row))}</span></td><td>${esc(row.instructor_name)}</td></tr>`).join('') : `<tr><td colspan="5">${emptyState(emptyTitle, emptyMessage)}</td></tr>`;
     const quickActions = canManage()
       ? [
         { page: 'schedules', addClass: true, icon: PATH.calendar, label: 'Add class' },
@@ -850,11 +850,15 @@
     return `<span class="room-type-badge ${type}">${scheduleTypeLabel(roomType)}</span>`;
   }
 
+  function roomBuildingLabel(row) {
+    return row.room_building || row.building || 'Building 1';
+  }
+
   function scheduleRow(row, includeAction = false, editable = canManage()) {
     const action = includeAction && canManage() ? `<td class="manage-column">${editable ? `<div class="row-actions"><button class="button button-ghost button-small edit-entry" data-entry-id="${Number(row.id)}" type="button">Edit</button><button class="button button-danger button-small cancel-entry" data-entry-id="${Number(row.id)}" type="button">Cancel</button></div>` : '—'}</td>` : '';
     const roomType = row.room_type || 'LECTURE';
     const colorClass = scheduleTypeClass(roomType);
-    return `<tr class="schedule-color-${colorClass}"><td>${esc(row.day_name)}</td><td><strong>${esc(row.time_label || row.slot_label)}</strong><span class="subline">${esc(scheduleDurationLabel(row))}</span></td><td><strong>${esc(row.subject_code)}</strong><span class="subline">${esc(row.subject_name)}${roomTypeBadge(roomType)}</span></td><td>${esc(row.section_code)}<span class="subline">${esc(row.program_code)}</span></td><td>${esc(row.instructor_name)}</td><td><strong>${esc(row.room_code)}</strong><span class="subline">${Number(row.room_capacity)} seats</span></td>${action}</tr>`;
+    return `<tr class="schedule-color-${colorClass}"><td>${esc(row.day_name)}</td><td><strong>${esc(row.time_label || row.slot_label)}</strong><span class="subline">${esc(scheduleDurationLabel(row))}</span></td><td><strong>${esc(row.subject_code)}</strong><span class="subline">${esc(row.subject_name)}${roomTypeBadge(roomType)}</span></td><td>${esc(row.section_code)}<span class="subline">${esc(row.program_code)}</span></td><td>${esc(row.instructor_name)}</td><td><strong>${esc(row.room_code)}</strong><span class="subline">${esc(roomBuildingLabel(row))} · ${Number(row.room_capacity)} seats</span></td>${action}</tr>`;
   }
 
   function scheduleDurationLabel(row) {
@@ -918,7 +922,7 @@
       : null;
     return scheduleViewRows().filter((row) => {
       const selected = state.scheduleView === 'all' || state.scheduleFilter === 'all' || (state.scheduleView === 'section' && String(row.section_id) === state.scheduleFilter) || (state.scheduleView === 'student' && selectedStudent && String(row.section_id) === String(selectedStudent.section_id)) || (state.scheduleView === 'instructor' && String(row.instructor_id) === state.scheduleFilter) || (state.scheduleView === 'room' && String(row.room_id) === state.scheduleFilter) || (state.scheduleView === 'room_type' && scheduleTypeClass(row.room_type) === state.scheduleFilter);
-      const searchable = `${row.subject_code} ${row.subject_name} ${row.section_code} ${row.instructor_name} ${row.room_code} ${row.room_type} ${row.day_name} ${row.slot_label}`.toLowerCase();
+      const searchable = `${row.subject_code} ${row.subject_name} ${row.section_code} ${row.instructor_name} ${row.room_code} ${roomBuildingLabel(row)} ${row.room_type} ${row.day_name} ${row.slot_label}`.toLowerCase();
       return selected && (!query || searchable.includes(query));
     });
   }
@@ -1023,11 +1027,11 @@
       renderRequestRooms();
       const roomRequests = requests.filter((item) => ['ROOM', 'OTHER'].includes(item.request_type || 'ROOM'));
       const changeRequests = requests.filter((item) => item.request_type === 'CHANGE');
-      $('#instructorRequestBody').innerHTML = roomRequests.length ? roomRequests.map((item) => `<tr><td>${item.request_type === 'OTHER' ? 'Others' : `${esc(item.subject_name)} - ${esc(item.section_code)}`}${item.request_type === 'OTHER' ? `<span class="subline">${esc(item.note)}</span>` : ''}</td><td>${esc(item.room_code)}</td><td>${esc(requestDateLabel(item))}</td><td>${esc(['','Monday','Tuesday','Wednesday','Thursday','Friday'][Number(item.day_of_week)] || item.day_of_week)}</td><td>${esc(item.slot_label)}</td><td>${esc(item.status)}</td></tr>`).join('') : `<tr><td colspan="6">${emptyState('No room requests', 'Your submitted room requests will appear here.')}</td></tr>`;
-      $('#instructorChangeRequestBody').innerHTML = changeRequests.length ? changeRequests.map((item) => `<tr><td>${esc(item.subject_name)} - ${esc(item.section_code)}</td><td>${esc(item.room_code)}</td><td>${esc(['','Monday','Tuesday','Wednesday','Thursday','Friday'][Number(item.day_of_week)] || item.day_of_week)}</td><td>${esc(item.slot_label)}</td><td>${esc(item.status)}</td></tr>`).join('') : `<tr><td colspan="5">${emptyState('No schedule change requests', 'Your submitted change requests will appear here.')}</td></tr>`;
+      $('#instructorRequestBody').innerHTML = roomRequests.length ? roomRequests.map((item) => `<tr><td>${item.request_type === 'OTHER' ? 'Others' : `${esc(item.subject_name)} - ${esc(item.section_code)}`}${item.request_type === 'OTHER' ? `<span class="subline">${esc(item.note)}</span>` : ''}</td><td><strong>${esc(item.room_code)}</strong><span class="subline">${esc(roomBuildingLabel(item))}</span></td><td>${esc(requestDateLabel(item))}</td><td>${esc(['','Monday','Tuesday','Wednesday','Thursday','Friday'][Number(item.day_of_week)] || item.day_of_week)}</td><td>${esc(item.slot_label)}</td><td>${esc(item.status)}</td></tr>`).join('') : `<tr><td colspan="6">${emptyState('No room requests', 'Your submitted room requests will appear here.')}</td></tr>`;
+      $('#instructorChangeRequestBody').innerHTML = changeRequests.length ? changeRequests.map((item) => `<tr><td>${esc(item.subject_name)} - ${esc(item.section_code)}</td><td><strong>${esc(item.room_code)}</strong><span class="subline">${esc(roomBuildingLabel(item))}</span></td><td>${esc(['','Monday','Tuesday','Wednesday','Thursday','Friday'][Number(item.day_of_week)] || item.day_of_week)}</td><td>${esc(item.slot_label)}</td><td>${esc(item.status)}</td></tr>`).join('') : `<tr><td colspan="5">${emptyState('No schedule change requests', 'Your submitted change requests will appear here.')}</td></tr>`;
       const scheduledClasses = schedules();
-      $('#changeEntry').innerHTML = scheduledClasses.map((row) => `<option value="${Number(row.id)}">${esc(row.subject_code)} - ${esc(row.section_code)} · ${esc(row.day_name)} · ${esc(row.time_label)} · ${esc(row.room_code)}</option>`).join('') || '<option value="">No published classes to change</option>';
-      $('#changeRoom').innerHTML = (state.snapshot.rooms || []).map((room) => `<option value="${Number(room.id)}">${esc(room.code)} - ${esc(room.name)}</option>`).join('') || '<option value="">No rooms available</option>';
+      $('#changeEntry').innerHTML = scheduledClasses.map((row) => `<option value="${Number(row.id)}">${esc(row.subject_code)} - ${esc(row.section_code)} · ${esc(row.day_name)} · ${esc(row.time_label)} · ${esc(row.room_code)} · ${esc(roomBuildingLabel(row))}</option>`).join('') || '<option value="">No published classes to change</option>';
+      $('#changeRoom').innerHTML = (state.snapshot.rooms || []).map((room) => `<option value="${Number(room.id)}">${esc(room.code)} - ${esc(room.name)} · ${esc(room.building || 'Building 1')}</option>`).join('') || '<option value="">No rooms available</option>';
       $('#submitScheduleChangeButton').disabled = scheduledClasses.length === 0 || !(state.snapshot.rooms || []).length;
       setChangeFormFromSelectedEntry();
     }
@@ -1038,11 +1042,11 @@
         const isOther = item.request_type === 'OTHER';
         const weekday = ['','Monday','Tuesday','Wednesday','Thursday','Friday'][Number(item.day_of_week)] || item.day_of_week;
         const current = isChange
-          ? `${['','Monday','Tuesday','Wednesday','Thursday','Friday'][Number(item.previous_day_of_week)] || 'Unavailable'} · ${requestTimeLabel({ request_start_time: item.previous_start_time, requested_end_time: item.previous_end_time })} · ${item.previous_room_code || 'Unavailable'}`
+          ? `${['','Monday','Tuesday','Wednesday','Thursday','Friday'][Number(item.previous_day_of_week)] || 'Unavailable'} · ${requestTimeLabel({ request_start_time: item.previous_start_time, requested_end_time: item.previous_end_time })} · ${item.previous_room_code || 'Unavailable'} · ${item.previous_room_building || 'Building unavailable'}`
           : '—';
         const dateOrDay = isChange ? weekday : requestDateLabel(item);
         const note = (item.note || '').replace(/^\[REQUEST_DATE:\d{4}-\d{2}-\d{2}\]\s*/, '') || '—';
-        return `<tr><td>${isChange ? 'Schedule change' : isOther ? 'Other room request' : 'Room request'}</td><td>${esc(item.instructor_name)}</td><td>${isOther ? 'Others' : `${esc(item.subject_name)} - ${esc(item.section_code)}`}</td><td>${esc(current)}</td><td>${esc(item.room_code)}</td><td>${esc(dateOrDay)}</td><td>${esc(item.slot_label)}</td><td>${esc(note)}</td><td><div class="row-actions"><button class="button button-primary button-small review-schedule-request" data-request-id="${Number(item.id)}" data-decision="APPROVE" type="button">Approve</button><button class="button button-danger button-small review-schedule-request" data-request-id="${Number(item.id)}" data-decision="REJECT" type="button">Reject</button></div></td></tr>`;
+        return `<tr><td>${isChange ? 'Schedule change' : isOther ? 'Other room request' : 'Room request'}</td><td>${esc(item.instructor_name)}</td><td>${isOther ? 'Others' : `${esc(item.subject_name)} - ${esc(item.section_code)}`}</td><td>${esc(current)}</td><td><strong>${esc(item.room_code)}</strong><span class="subline">${esc(roomBuildingLabel(item))}</span></td><td>${esc(dateOrDay)}</td><td>${esc(item.slot_label)}</td><td>${esc(note)}</td><td><div class="row-actions"><button class="button button-primary button-small review-schedule-request" data-request-id="${Number(item.id)}" data-decision="APPROVE" type="button">Approve</button><button class="button button-danger button-small review-schedule-request" data-request-id="${Number(item.id)}" data-decision="REJECT" type="button">Reject</button></div></td></tr>`;
       }).join('') : `<tr><td colspan="9">${emptyState('No pending instructor requests', 'Room and schedule change requests will appear here.')}</td></tr>`;
     }
   }
@@ -1312,7 +1316,7 @@
     if (state.scheduleView === 'section') values = unique('section_id', (item) => `${item.section_code} - ${item.program_code}`);
     if (state.scheduleView === 'student') values = students.map((student) => [student.id, `${student.display_name} · ${student.section_code || 'Unassigned section'}`]);
     if (state.scheduleView === 'instructor') values = unique('instructor_id', (item) => item.instructor_name);
-    if (state.scheduleView === 'room') values = unique('room_id', (item) => item.room_code);
+    if (state.scheduleView === 'room') values = unique('room_id', (item) => `${item.room_code} · ${roomBuildingLabel(item)}`);
     if (state.scheduleView === 'room_type') values = [['lecture', 'Lecture'], ['lab', 'Laboratory'], ['other', 'Special']];
     $('#scheduleFilterValueWrap').hidden = state.scheduleView === 'all';
     select.innerHTML = `<option value="all">All</option>${values.map(([id, label]) => `<option value="${esc(id)}">${esc(label)}</option>`).join('')}`;
@@ -1360,8 +1364,9 @@
       const eventClass = scheduleTypeClass(roomType);
       const timeLabel = scheduleTimeRangeLabel(row);
       const duration = scheduleDurationLabel(row);
-      const title = `${row.subject_code} | ${row.section_code} | ${row.room_code} | ${row.instructor_name} | ${timeLabel} | ${duration}`;
-      return `<article class="calendar-event ${eventClass}${rowSpan > 1 ? ' calendar-event-long' : ''}" aria-label="${esc(title)}" title="${esc(title)}"><span class="calendar-event-time">${esc(timeLabel)}</span><strong>${esc(row.subject_code)}</strong><span>${esc(row.section_code)} · ${esc(row.room_code)}</span><span class="calendar-event-instructor">${esc(row.instructor_name)}</span></article>`;
+      const roomLocation = `${row.room_code} · ${roomBuildingLabel(row)}`;
+      const title = `${row.subject_code} | ${row.section_code} | ${roomLocation} | ${row.instructor_name} | ${timeLabel} | ${duration}`;
+      return `<article class="calendar-event ${eventClass}${rowSpan > 1 ? ' calendar-event-long' : ''}" aria-label="${esc(title)}" title="${esc(title)}"><span class="calendar-event-time">${esc(timeLabel)}</span><strong>${esc(row.subject_code)}</strong><span>${esc(row.section_code)} · ${esc(roomLocation)}</span><span class="calendar-event-instructor">${esc(row.instructor_name)}</span></article>`;
     };
 
     let html = '<div class="calendar-cell calendar-head calendar-row-1 calendar-column-1">Time</div>';
@@ -1752,7 +1757,7 @@
     const axisMax = Math.max(4, Math.ceil(max / 4) * 4);
     const axisTicks = Array.from({ length: 5 }, (_, index) => Math.round(axisMax * index / 4));
     $('#roomReport').innerHTML = roomRows.length
-      ? `<div class="room-chart-legend" aria-label="Room type legend">${[['lecture', 'Lecture'], ['lab', 'Lab'], ['other', 'Special']].map(([type, label]) => `<span><i class="room-type-key type-${type}" aria-hidden="true"></i>${label}</span>`).join('')}</div><div class="room-chart-layout"><span class="room-chart-y-axis" aria-hidden="true">Rooms</span><div class="room-chart-plot"><div class="room-chart-rows" role="list" aria-label="Scheduled classes by room">${roomRows.map(({ room, count, type }) => `<div class="bar-row" role="listitem"><span class="bar-label" title="${esc(room.name)}"><strong>${esc(room.code)}</strong><small>${scheduleTypeLabel(room.room_type)}</small></span><div class="bar-track" role="img" aria-label="${esc(room.code)}: ${count} scheduled class${count === 1 ? '' : 'es'}"><div class="bar-fill type-${type}" data-fill="${Math.round((count / axisMax) * 100)}"></div></div><strong class="bar-value">${count}</strong></div>`).join('')}</div><div class="room-chart-scale" aria-hidden="true"><span></span><div>${axisTicks.map((tick) => `<span>${tick}</span>`).join('')}</div><span></span></div><div class="room-chart-x-axis" aria-hidden="true"><span></span><strong>Scheduled class meetings</strong><span></span></div></div></div>`
+      ? `<div class="room-chart-legend" aria-label="Room type legend">${[['lecture', 'Lecture'], ['lab', 'Lab'], ['other', 'Special']].map(([type, label]) => `<span><i class="room-type-key type-${type}" aria-hidden="true"></i>${label}</span>`).join('')}</div><div class="room-chart-layout"><span class="room-chart-y-axis" aria-hidden="true">Rooms</span><div class="room-chart-plot"><div class="room-chart-rows" role="list" aria-label="Scheduled classes by room">${roomRows.map(({ room, count, type }) => `<div class="bar-row" role="listitem"><span class="bar-label" title="${esc(room.name)}"><strong>${esc(room.code)}</strong><small>${esc(room.building || 'Building 1')} · ${scheduleTypeLabel(room.room_type)}</small></span><div class="bar-track" role="img" aria-label="${esc(room.code)} in ${esc(room.building || 'Building 1')}: ${count} scheduled class${count === 1 ? '' : 'es'}"><div class="bar-fill type-${type}" data-fill="${Math.round((count / axisMax) * 100)}"></div></div><strong class="bar-value">${count}</strong></div>`).join('')}</div><div class="room-chart-scale" aria-hidden="true"><span></span><div>${axisTicks.map((tick) => `<span>${tick}</span>`).join('')}</div><span></span></div><div class="room-chart-x-axis" aria-hidden="true"><span></span><strong>Scheduled class meetings</strong><span></span></div></div></div>`
       : emptyState('No rooms configured', 'Add rooms under Academic setup to measure utilization.');
     // Widths are applied through the CSSOM because inline style attributes are blocked by CSP.
     $$('#roomReport .bar-fill').forEach((bar) => { bar.style.width = `${bar.dataset.fill}%`; });
@@ -1872,7 +1877,11 @@
     const filterOptions = (key, label) => {
       const values = [...new Set(group.entries.map(({ row }) => String(row[key] || '').trim()).filter(Boolean))]
         .sort((left, right) => left.localeCompare(right));
-      return `<label class="schedule-detail-filter">${esc(label)}<select data-schedule-detail-filter="${esc(key)}"><option value="">All ${esc(label.toLowerCase())}</option>${values.map((value) => `<option value="${esc(value)}">${esc(value)}</option>`).join('')}</select></label>`;
+      return `<label class="schedule-detail-filter">${esc(label)}<select data-schedule-detail-filter="${esc(key)}"><option value="">All ${esc(label.toLowerCase())}</option>${values.map((value) => {
+        const room = key === 'room_code' ? group.entries.find(({ row }) => String(row.room_code) === value)?.row : null;
+        const optionLabel = room ? `${value} · ${roomBuildingLabel(room)}` : value;
+        return `<option value="${esc(value)}">${esc(optionLabel)}</option>`;
+      }).join('')}</select></label>`;
     };
     $('#modalBody').innerHTML = `<div class="schedule-detail-filters"><label class="schedule-detail-search">Search this time slot<input type="search" data-schedule-detail-search placeholder="Subject, section, instructor, or room" autocomplete="off"></label>${filterOptions('section_code', 'Section')}${filterOptions('instructor_name', 'Instructor')}${filterOptions('room_code', 'Room')}</div><p class="schedule-detail-result-count" data-schedule-detail-count aria-live="polite"></p><div class="schedule-detail-list" data-schedule-detail-list></div>`;
     renderCalendarDetailResults();
@@ -1892,7 +1901,7 @@
     const selectedRoom = text($('[data-schedule-detail-filter="room_code"]', $('#modalBody'))?.value);
     const matches = group.entries.filter(({ row }) => {
       const subject = subjectById(row.subject_id);
-      const searchable = `${row.subject_code} ${row.subject_name || subject?.name || ''} ${row.section_code} ${row.program_code || ''} ${row.instructor_name} ${row.room_code}`.toLowerCase();
+      const searchable = `${row.subject_code} ${row.subject_name || subject?.name || ''} ${row.section_code} ${row.program_code || ''} ${row.instructor_name} ${row.room_code} ${roomBuildingLabel(row)}`.toLowerCase();
       return (!query || searchable.includes(query))
         && (!selectedSection || String(row.section_code) === selectedSection)
         && (!selectedInstructor || String(row.instructor_name) === selectedInstructor)
@@ -1904,7 +1913,7 @@
       const subject = subjectById(row.subject_id);
       const roomType = row.room_type || subject?.room_type || 'LECTURE';
       const type = scheduleTypeClass(roomType);
-      return `<article class="schedule-detail-card schedule-color-${type}"><div class="schedule-detail-heading"><strong>${esc(row.subject_code)}</strong><span>${esc(row.time_label || row.slot_label)} · ${esc(scheduleDurationLabel(row))}</span></div><p>${esc(row.subject_name || subject?.name || '')}${roomTypeBadge(roomType)}</p><dl><div><dt>Section</dt><dd>${esc(row.section_code)}${row.program_code ? ` · ${esc(row.program_code)}` : ''}</dd></div><div><dt>Instructor</dt><dd>${esc(row.instructor_name)}</dd></div><div><dt>Room</dt><dd>${esc(row.room_code)}${row.room_capacity ? ` · ${Number(row.room_capacity)} seats` : ''}</dd></div></dl></article>`;
+      return `<article class="schedule-detail-card schedule-color-${type}"><div class="schedule-detail-heading"><strong>${esc(row.subject_code)}</strong><span>${esc(row.time_label || row.slot_label)} · ${esc(scheduleDurationLabel(row))}</span></div><p>${esc(row.subject_name || subject?.name || '')}${roomTypeBadge(roomType)}</p><dl><div><dt>Section</dt><dd>${esc(row.section_code)}${row.program_code ? ` · ${esc(row.program_code)}` : ''}</dd></div><div><dt>Instructor</dt><dd>${esc(row.instructor_name)}</dd></div><div><dt>Room</dt><dd>${esc(row.room_code)} · ${esc(roomBuildingLabel(row))}${row.room_capacity ? ` · ${Number(row.room_capacity)} seats` : ''}</dd></div></dl></article>`;
     }).join('') : '<p class="schedule-detail-empty">No classes match these filters. Try changing or clearing a filter.</p>';
   }
 

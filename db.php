@@ -398,6 +398,7 @@ function normalize_section_catalog(PDO $pdo): void
 
 function normalize_room_catalog(PDO $pdo): void
 {
+    $pdo->exec("ALTER TABLE rooms ADD COLUMN IF NOT EXISTS building TEXT NOT NULL DEFAULT 'Building 1'");
     $lectureCapacity = max(40, (int) ($pdo->query('SELECT COALESCE(MAX(student_count), 40) FROM sections WHERE active = 1')->fetchColumn() ?: 40));
     $rooms = [
         ['RLE', 'Related Learning Experience (RLE)', 'SPECIAL', 40, ['Projector']],
@@ -661,10 +662,10 @@ function seed_database(PDO $pdo): void
         }
 
         $user = $pdo->prepare('INSERT INTO users (username, password_hash, display_name, email, role, instructor_id, section_id) VALUES (?, ?, ?, ?, ?, ?, ?)');
-        $user->execute(['admin', password_hash('Admin123!', PASSWORD_DEFAULT), 'SuperAdmin', 'admin@example.invalid', 'admin', null, null]);
-        $user->execute(['scheduler', password_hash('Scheduler123!', PASSWORD_DEFAULT), 'Admin', 'scheduler@example.invalid', 'scheduler', null, null]);
-        $user->execute(['instructor', password_hash('Instructor123!', PASSWORD_DEFAULT), 'Prof. Respende', 'respende@example.invalid', 'instructor', $instructorIds[0], null]);
-        $user->execute(['student', password_hash('Student123!', PASSWORD_DEFAULT), 'BSIT Student', 'student@example.invalid', 'student', null, $studentSectionId]);
+        $user->execute(['superadmin', password_hash('Superadmin1234!', PASSWORD_DEFAULT), 'SuperAdmin', 'admin@example.invalid', 'admin', null, null]);
+        $user->execute(['scheduler', password_hash('Admin1234!', PASSWORD_DEFAULT), 'Admin', 'scheduler@example.invalid', 'scheduler', null, null]);
+        $user->execute(['instructor', password_hash('Instructor1234!', PASSWORD_DEFAULT), 'Prof. Respende', 'respende@example.invalid', 'instructor', $instructorIds[0], null]);
+        $user->execute(['student', password_hash('Student1234!', PASSWORD_DEFAULT), 'BSIT Student', 'student@example.invalid', 'student', null, $studentSectionId]);
 
         $settings = $pdo->prepare('INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?)');
         $settings->execute(['institution_name', 'New Sinai School and Colleges Sta. Rosa, Inc.']);

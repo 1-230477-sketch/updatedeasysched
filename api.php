@@ -1245,7 +1245,7 @@ function scoped_schedule(PDO $pdo, array $user, int $termId, ?int $runId = null)
     $sql = 'SELECT se.id, se.run_id, se.offering_id, se.meeting_no, se.day_of_week, se.slot_id,
                    ts.code AS slot_code, ts.label AS slot_label, COALESCE(se.start_time_override, ts.start_time) AS start_time,
                    COALESCE(se.end_time_override, (SELECT end_time FROM time_slots ts_end WHERE ts_end.slot_order = ts.slot_order + s.duration_slots - 1), ts.end_time) AS end_time,
-                   r.id AS room_id, r.code AS room_code, r.name AS room_name, r.capacity AS room_capacity, r.room_type,
+                   r.id AS room_id, r.code AS room_code, r.name AS room_name, r.building AS room_building, r.capacity AS room_capacity, r.room_type,
                    s.id AS subject_id, s.code AS subject_code, s.name AS subject_name, s.duration_slots,
                    sec.id AS section_id, sec.code AS section_code, sec.student_count,
                    p.code AS program_code, p.name AS program_name,
@@ -1374,7 +1374,7 @@ function bootstrap(PDO $pdo, array $user): array
     }
     $scheduleRequests = [];
     if (in_array($user['role'], ['admin', 'instructor'], true)) {
-        $requestSql = "SELECT sr.*, s.code AS subject_code, CASE WHEN sr.request_type='OTHER' THEN 'Others' ELSE s.name END AS subject_name, sec.code AS section_code, i.name AS instructor_name, r.code AS room_code, ts.label AS slot_label, ts.start_time AS request_start_time, COALESCE(sr.requested_end_time, ts.end_time) AS requested_end_time, CASE WHEN target.id IS NULL THEN NULL ELSE target.day_of_week END AS previous_day_of_week, COALESCE(target.start_time_override, targetSlot.start_time) AS previous_start_time, COALESCE(target.end_time_override, (SELECT previousEnd.end_time FROM time_slots previousEnd WHERE previousEnd.slot_order = targetSlot.slot_order + s.duration_slots - 1), targetSlot.end_time) AS previous_end_time, targetRoom.code AS previous_room_code FROM schedule_requests sr LEFT JOIN course_offerings co ON co.id=sr.offering_id LEFT JOIN subjects s ON s.id=co.subject_id LEFT JOIN sections sec ON sec.id=co.section_id JOIN instructors i ON i.id=sr.instructor_id JOIN rooms r ON r.id=sr.room_id JOIN time_slots ts ON ts.id=sr.slot_id LEFT JOIN schedule_entries target ON target.id=sr.target_entry_id LEFT JOIN rooms targetRoom ON targetRoom.id=target.room_id LEFT JOIN time_slots targetSlot ON targetSlot.id=target.slot_id WHERE 1=1";
+        $requestSql = "SELECT sr.*, s.code AS subject_code, CASE WHEN sr.request_type='OTHER' THEN 'Others' ELSE s.name END AS subject_name, sec.code AS section_code, i.name AS instructor_name, r.code AS room_code, r.building AS room_building, ts.label AS slot_label, ts.start_time AS request_start_time, COALESCE(sr.requested_end_time, ts.end_time) AS requested_end_time, CASE WHEN target.id IS NULL THEN NULL ELSE target.day_of_week END AS previous_day_of_week, COALESCE(target.start_time_override, targetSlot.start_time) AS previous_start_time, COALESCE(target.end_time_override, (SELECT previousEnd.end_time FROM time_slots previousEnd WHERE previousEnd.slot_order = targetSlot.slot_order + s.duration_slots - 1), targetSlot.end_time) AS previous_end_time, targetRoom.code AS previous_room_code, targetRoom.building AS previous_room_building FROM schedule_requests sr LEFT JOIN course_offerings co ON co.id=sr.offering_id LEFT JOIN subjects s ON s.id=co.subject_id LEFT JOIN sections sec ON sec.id=co.section_id JOIN instructors i ON i.id=sr.instructor_id JOIN rooms r ON r.id=sr.room_id JOIN time_slots ts ON ts.id=sr.slot_id LEFT JOIN schedule_entries target ON target.id=sr.target_entry_id LEFT JOIN rooms targetRoom ON targetRoom.id=target.room_id LEFT JOIN time_slots targetSlot ON targetSlot.id=target.slot_id WHERE 1=1";
         $requestParams = [];
         if ($user['role'] === 'instructor') { $requestSql .= ' AND sr.instructor_id = ?'; $requestParams[] = (int) $user['instructor_id']; }
         if ($user['role'] === 'admin') $requestSql .= " AND sr.status='PENDING'";
@@ -3123,9 +3123,9 @@ function export_csv(PDO $pdo, array $user, int $termId, ?int $runId = null): nev
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="EasySched-Schedule-' . ($runId === null ? '' : 'History-') . date('Y-m-d') . '.csv"');
     $out = fopen('php://output', 'wb');
-    fputcsv($out, ['Subject Code', 'Subject', 'Section', 'Program', 'Instructor', 'Room', 'Day', 'Time', 'Enrollment']);
+    fputcsv($out, ['Subject Code', 'Subject', 'Section', 'Program', 'Instructor', 'Room', 'Building', 'Day', 'Time', 'Enrollment']);
     foreach ($rows as $row) {
-        $values = [$row['subject_code'], $row['subject_name'], $row['section_code'], $row['program_code'], $row['instructor_name'], $row['room_code'], $row['day_name'], $row['time_label'], $row['student_count']];
+        $values = [$row['subject_code'], $row['subject_name'], $row['section_code'], $row['program_code'], $row['instructor_name'], $row['room_code'], $row['room_building'], $row['day_name'], $row['time_label'], $row['student_count']];
         foreach ($values as &$value) {
             $value = (string) $value;
             if ($value !== '' && in_array($value[0], ['=', '+', '-', '@'], true)) {
