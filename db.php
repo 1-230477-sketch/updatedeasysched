@@ -660,8 +660,8 @@ function seed_database(PDO $pdo): void
         }
 
         $user = $pdo->prepare('INSERT INTO users (username, password_hash, display_name, email, role, instructor_id, section_id) VALUES (?, ?, ?, ?, ?, ?, ?)');
-        $user->execute(['admin', password_hash('Admin123!', PASSWORD_DEFAULT), 'System Administrator', 'admin@example.invalid', 'admin', null, null]);
-        $user->execute(['scheduler', password_hash('Scheduler123!', PASSWORD_DEFAULT), 'Scheduling Coordinator', 'scheduler@example.invalid', 'scheduler', null, null]);
+        $user->execute(['admin', password_hash('Admin123!', PASSWORD_DEFAULT), 'SuperAdmin', 'admin@example.invalid', 'admin', null, null]);
+        $user->execute(['scheduler', password_hash('Scheduler123!', PASSWORD_DEFAULT), 'Admin', 'scheduler@example.invalid', 'scheduler', null, null]);
         $user->execute(['instructor', password_hash('Instructor123!', PASSWORD_DEFAULT), 'Prof. Respende', 'respende@example.invalid', 'instructor', $instructorIds[0], null]);
         $user->execute(['student', password_hash('Student123!', PASSWORD_DEFAULT), 'BSIT Student', 'student@example.invalid', 'student', null, $studentSectionId]);
 

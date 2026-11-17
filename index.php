@@ -571,6 +571,10 @@ const EASYSCHED_SCHOOL = 'New Sinai School and Colleges Sta. Rosa, Inc.';
                             <div class="field"><label for="requestEndTime">End time</label><div class="time-input-group"><input id="requestEndTime" value="09:00" inputmode="numeric" maxlength="5" pattern="[0-9]{2}:[0-9]{2}" placeholder="HH:MM" required><select id="requestEndPeriod" aria-label="End time period"><option>AM</option><option>PM</option></select></div></div>
                             <div class="field"><label for="requestRoom">Available room</label><select id="requestRoom" required><option value="">Choose a date and time first</option></select></div>
                             <div class="field full"><p id="roomAvailabilityStatus" class="availability-status muted" role="status" aria-live="polite">Choose a date, start time, and end time to find available rooms.</p></div>
+                            <div class="field full"><div id="requestRoomAvailability" class="request-room-availability" hidden>
+                                <div class="request-summary-header">Available times in selected room</div>
+                                <div id="requestRoomAvailabilityList" class="request-room-availability-list"></div>
+                            </div></div>
                             <div class="field full" id="requestNoteField"><label for="requestNote">Note <span class="muted">(optional)</span></label><input id="requestNote" maxlength="300" placeholder="Additional details"></div>
                             <div class="field full"><button class="button button-primary" id="submitRoomRequestButton" type="submit" disabled>Submit room request</button></div>
                         </form>

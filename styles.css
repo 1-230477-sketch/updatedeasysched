@@ -1239,6 +1239,56 @@ kbd {
 .status-dot.pending { background: var(--warning); box-shadow: 0 0 0 3px var(--warning-soft); }
 .status-dot.error { background: var(--danger); box-shadow: 0 0 0 3px var(--danger-soft); }
 
+.request-summary-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid rgba(126, 208, 168, .2);
+  border-radius: 10px;
+  background: rgba(13, 85, 65, .2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .03);
+}
+.request-summary-header {
+  color: #9ae4c4;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.request-summary-content {
+  color: #edf9f1;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.request-room-availability {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid rgba(126, 208, 168, .18);
+  border-radius: 10px;
+  background: rgba(11, 51, 39, .28);
+}
+.request-room-availability-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.request-room-time-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border: 1px solid rgba(126, 208, 168, .24);
+  border-radius: 999px;
+  background: rgba(109, 199, 160, .12);
+  color: #dff8e9;
+  font-size: 12px;
+  font-weight: 700;
+}
+.request-room-time-pill.muted {
+  background: rgba(192, 198, 195, .08);
+  color: #bfd6cd;
+}
+
 .sidebar-backdrop { display: none; }
 
 /* Topbar */
