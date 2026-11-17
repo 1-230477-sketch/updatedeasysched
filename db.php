@@ -415,6 +415,7 @@ function normalize_room_catalog(PDO $pdo): void
     $legacyCodes = ['ROOM-201', 'COMLAB-1', 'COMLAB-2', 'COMLAB-3', 'ROOM-202', 'LH-A', 'LH-B'];
 
     foreach ($rooms as $index => [$code, $name, $type, $capacity, $features]) {
+        $building = ((int) hexdec(substr(hash('crc32b', $code), -8)) % 2 === 0) ? 'Building 1' : 'Building 2';
         $stmt = $pdo->prepare('SELECT id FROM rooms WHERE code = ? LIMIT 1');
         $stmt->execute([$code]);
         $id = $stmt->fetchColumn();
@@ -423,11 +424,11 @@ function normalize_room_catalog(PDO $pdo): void
             $id = $stmt->fetchColumn();
         }
         if ($id) {
-            $update = $pdo->prepare('UPDATE rooms SET code = ?, name = ?, capacity = ?, room_type = ?, features_json = ?, active = 1 WHERE id = ?');
-            $update->execute([$code, $name, $capacity, $type, json_encode($features, JSON_THROW_ON_ERROR), $id]);
+            $update = $pdo->prepare('UPDATE rooms SET code = ?, name = ?, capacity = ?, room_type = ?, building = ?, features_json = ?, active = 1 WHERE id = ?');
+            $update->execute([$code, $name, $capacity, $type, $building, json_encode($features, JSON_THROW_ON_ERROR), $id]);
         } else {
-            $insert = $pdo->prepare('INSERT INTO rooms (code, name, capacity, room_type, features_json, active) VALUES (?, ?, ?, ?, ?, 1)');
-            $insert->execute([$code, $name, $capacity, $type, json_encode($features, JSON_THROW_ON_ERROR)]);
+            $insert = $pdo->prepare('INSERT INTO rooms (code, name, capacity, room_type, building, features_json, active) VALUES (?, ?, ?, ?, ?, ?, 1)');
+            $insert->execute([$code, $name, $capacity, $type, $building, json_encode($features, JSON_THROW_ON_ERROR)]);
         }
     }
 }

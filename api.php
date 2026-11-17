@@ -1337,7 +1337,7 @@ function bootstrap(PDO $pdo, array $user): array
     $terms = $pdo->query('SELECT id, academic_year, semester, is_active FROM academic_terms ORDER BY academic_year DESC, id DESC')->fetchAll();
     $programs = $pdo->query('SELECT id, code, name, active FROM programs WHERE active = 1 ORDER BY code')->fetchAll();
     $instructors = $pdo->query('SELECT id, employee_no, name, email, max_hours_day, active FROM instructors WHERE active = 1 ORDER BY id')->fetchAll();
-    $rooms = decode_rows($pdo->query('SELECT id, code, name, capacity, room_type, features_json, active FROM rooms WHERE active = 1 ORDER BY code')->fetchAll(), ['features_json']);
+    $rooms = decode_rows($pdo->query('SELECT id, code, name, capacity, room_type, building, features_json, active FROM rooms WHERE active = 1 ORDER BY code')->fetchAll(), ['features_json']);
     foreach ($rooms as &$room) {
         $room['features'] = $room['features_json'];
         unset($room['features_json']);
@@ -1467,7 +1467,7 @@ function load_offerings(PDO $pdo, int $termId): array
 function load_scheduler_context(PDO $pdo): array
 {
     $slots = $pdo->query('SELECT id, slot_order, start_time, end_time FROM time_slots WHERE slot_order <> 6 ORDER BY slot_order')->fetchAll();
-    $rooms = decode_rows($pdo->query('SELECT id, capacity, room_type, features_json FROM rooms WHERE active = 1')->fetchAll(), ['features_json']);
+    $rooms = decode_rows($pdo->query('SELECT id, capacity, room_type, building, features_json FROM rooms WHERE active = 1')->fetchAll(), ['features_json']);
     foreach ($rooms as &$room) {
         $room['features'] = array_map('strtolower', array_map('strval', $room['features_json']));
         unset($room['features_json']);
@@ -2633,7 +2633,7 @@ function validate_room_request_submission(PDO $pdo, array $input, array $user): 
 
 function available_rooms_for_request(PDO $pdo, array $user, array $input): array
 {
-    $rooms = $pdo->query('SELECT id, code, name, room_type FROM rooms WHERE active = 1 ORDER BY code')->fetchAll();
+    $rooms = $pdo->query('SELECT id, code, name, room_type, building FROM rooms WHERE active = 1 ORDER BY code')->fetchAll();
     $available = [];
     $blockers = [];
     foreach ($rooms as $room) {
@@ -2968,9 +2968,11 @@ function save_master(PDO $pdo, array $user, array $input): array
     if ($entity === 'rooms') {
         $code = input_code($data, 'code'); $name = input_string($data, 'name', 120); $capacity = input_int($data, 'capacity', 1, 5000); $type = strtoupper(input_string($data, 'room_type', 20));
         if (!in_array($type, ['LECTURE', 'LAB', 'SPECIAL'], true)) throw new ApiError(422, 'Room type is invalid.');
+        $building = trim((string) ($data['building'] ?? 'Building 1'));
+        if (!in_array($building, ['Building 1', 'Building 2'], true)) throw new ApiError(422, 'Room building is invalid.');
         $features = clean_string_list($data['features'] ?? []);
-        if ($recordId) { $stmt = $pdo->prepare('UPDATE rooms SET code=?, name=?, capacity=?, room_type=?, features_json=? WHERE id=?'); $stmt->execute([$code, $name, $capacity, $type, encode_json($features), $recordId]); }
-        else { $stmt = $pdo->prepare('INSERT INTO rooms (code,name,capacity,room_type,features_json) VALUES (?,?,?,?,?)'); $stmt->execute([$code,$name,$capacity,$type,encode_json($features)]); $recordId = db_insert_id($pdo, 'rooms'); }
+        if ($recordId) { $stmt = $pdo->prepare('UPDATE rooms SET code=?, name=?, capacity=?, room_type=?, building=?, features_json=? WHERE id=?'); $stmt->execute([$code, $name, $capacity, $type, $building, encode_json($features), $recordId]); }
+        else { $stmt = $pdo->prepare('INSERT INTO rooms (code,name,capacity,room_type,building,features_json) VALUES (?,?,?,?,?,?)'); $stmt->execute([$code,$name,$capacity,$type,$building,encode_json($features)]); $recordId = db_insert_id($pdo, 'rooms'); }
     } elseif ($entity === 'instructors') {
         $employeeNo = input_code($data, 'employee_no'); $name = input_string($data, 'name', 120); $email = input_email($data); $max = input_int($data, 'max_hours_day', 1, 16);
         if ($recordId) { $stmt = $pdo->prepare('UPDATE instructors SET employee_no=?, name=?, email=?, max_hours_day=? WHERE id=?'); $stmt->execute([$employeeNo,$name,$email,$max,$recordId]); }
@@ -3580,8 +3582,8 @@ function handle(PDO $pdo): never
             throw new ApiError(422, 'The security answer is incorrect or expired. Try the new image.', login_captcha_issue());
         }
         if ($username === '' || strlen($username) > 80 || $password === '' || (function_exists('mb_strlen') ? mb_strlen($password) : strlen($password)) > 200) login_failure($pdo, $username, $ipKey, $accountKey, $now, 'invalid_input');
-        $stmt = $pdo->prepare('SELECT * FROM users WHERE username = ? AND active = 1 LIMIT 1'); 
-        $stmt->execute([$username]); 
+        $stmt = $pdo->prepare('SELECT * FROM users WHERE active = 1 AND (LOWER(username) = LOWER(?) OR LOWER(display_name) = LOWER(?)) ORDER BY CASE WHEN LOWER(username) = LOWER(?) THEN 0 ELSE 1 END, id LIMIT 1');
+        $stmt->execute([$username, $username, $username]);
         $record = $stmt->fetch();
         if (!$record || !password_verify($password, $record['password_hash'])) login_failure($pdo, $username, $ipKey, $accountKey, $now, 'invalid_credentials');
         $pdo->prepare('DELETE FROM login_throttles WHERE throttle_key IN (?, ?)')->execute([$ipKey, $accountKey]);

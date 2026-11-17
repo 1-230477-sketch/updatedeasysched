@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS rooms (
     name TEXT NOT NULL,
     capacity INTEGER NOT NULL CHECK (capacity BETWEEN 1 AND 5000),
     room_type TEXT NOT NULL CHECK (room_type IN ('LECTURE', 'LAB', 'SPECIAL')),
+    building TEXT NOT NULL DEFAULT 'Building 1' CHECK (building IN ('Building 1', 'Building 2')),
     features_json TEXT NOT NULL DEFAULT '[]',
     active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1))
 );
